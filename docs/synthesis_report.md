@@ -46,10 +46,22 @@ deferred phase — see the README roadmap).
 | ACC_LOOP | 4 | 1 | 1 | yes |
 
 The per-sample accumulation loop achieves **II = 1**: one input sample is consumed
-every clock. The loop trip count and total latency report as variable (`?`)
-because the window length is data-dependent in the C source — the loop runs until
-`tlast` rather than a compile-time constant — which is the honest result for a
-streaming kernel whose window size is a run-time parameter.
+every clock.
+
+### Latency is not bounded by synthesis
+
+The csynth report lists the loop trip count and the absolute latency (cycles) as
+`?`. This is correct and expected: `WINDOW_SIZE` is a run-time input, the loop runs
+until `tlast` rather than a compile-time constant, so the total cycle latency is
+unbounded at synthesis. Synthesis therefore reports throughput (II = 1) and the
+per-iteration latency (4 cycles), but **not** a single absolute latency figure, and
+none is invented here.
+
+The real per-window latency is measured directly in XSim by
+`axis_latency_counter` (first accepted input beat to the metrics output beat,
+including stalls): **1021 cycles with no backpressure and up to 2038 cycles under
+burst backpressure** at the default 1024-sample window. That measured number, not a
+synthesized one, is the latency this design reports.
 
 ## Utilization estimates (from `gnss_metric_hls_csynth.rpt`)
 

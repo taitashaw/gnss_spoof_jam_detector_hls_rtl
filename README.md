@@ -189,6 +189,13 @@ raw reports in `docs/synth/`); none are estimated by hand:
 These are post-C-synthesis estimates; post-implementation timing closure is a
 deferred phase (see the roadmap).
 
+Absolute cycle latency is **not** bounded by synthesis: `WINDOW_SIZE` is a run-time
+input, so the accumulation loop's trip count and total latency report as `?` in the
+csynth report (synthesis gives throughput, II = 1, but no fixed latency). The real
+per-window latency is the XSim-measured **1021 cycles with no backpressure and up to
+2038 cycles under burst backpressure** (from `axis_latency_counter`), not a
+synthesized figure.
+
 ## Verification
 
 ![XSim waveform under burst backpressure](docs/images/waveform_mixed_attack.png)
