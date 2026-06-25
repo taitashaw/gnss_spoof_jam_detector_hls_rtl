@@ -17,7 +17,7 @@ PART        ?= xczu7ev-ffvc1156-2-e
 
 .DEFAULT_GOAL := help
 
-.PHONY: help vectors selfcheck refsim check summary plots hls xsim all clean
+.PHONY: help vectors selfcheck refsim check summary plots hls hls-csim xsim all clean
 
 help:
 	@echo "GNSS Spoof/Jam Detector -- make targets"
@@ -29,7 +29,9 @@ help:
 	@echo "  make check       Validate results against expected ranges + exact flags."
 	@echo "  make summary     Write results/summary.md."
 	@echo "  make plots       Optional matplotlib plots -> results/plots/*.png."
-	@echo "  make hls         Vitis HLS C-sim + synth (needs vitis_hls on PATH)."
+	@echo "  make hls         Vitis HLS C-sim + synth + export (needs vitis_hls on PATH)."
+	@echo "  make hls-csim    HLS kernel C-sim vs golden via g++ + Vitis headers"
+	@echo "                   (validates the synthesizable source; no synthesis)."
 	@echo "  make xsim        XSim cycle sim for all scenarios (needs Vivado/xvlog)."
 	@echo "  make all         selfcheck, then hls + xsim if their tools are present."
 	@echo "  make clean       Remove build/ and results/ artifacts."
@@ -62,6 +64,9 @@ hls:
 	  echo "ERROR: vitis_hls not on PATH. Install Vitis HLS 2022.2+ or run 'make selfcheck'."; exit 1; }
 	@bash $(SCRIPTS)/run_hls.sh $(PART)
 
+hls-csim: vectors
+	@bash $(SCRIPTS)/run_hls_csim.sh
+
 xsim: vectors
 	@command -v xvlog >/dev/null 2>&1 || { \
 	  echo "ERROR: xvlog/Vivado not on PATH. Install Vivado 2022.2+ or run 'make selfcheck'."; exit 1; }
@@ -71,7 +76,8 @@ all: selfcheck
 	@echo ""
 	@if command -v vitis_hls >/dev/null 2>&1; then \
 	  echo "== Vitis HLS detected: running make hls =="; $(MAKE) hls || true; \
-	else echo "== Vitis HLS not found: skipping make hls =="; fi
+	else echo "== Vitis HLS not found: trying HLS C-sim via headers (make hls-csim) =="; \
+	  $(MAKE) hls-csim || echo "   (hls-csim skipped: no Vitis headers)"; fi
 	@if command -v xvlog >/dev/null 2>&1; then \
 	  echo "== Vivado/XSim detected: running make xsim =="; $(MAKE) xsim || true; $(MAKE) check summary || true; \
 	else echo "== Vivado/XSim not found: skipping make xsim =="; fi

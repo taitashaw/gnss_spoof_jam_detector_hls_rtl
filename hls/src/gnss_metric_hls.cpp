@@ -99,7 +99,7 @@ ACC_LOOP:
         ap_int<2>  ce = w[32] ? (ap_int<2>)1 : (ap_int<2>)-1;
         ap_int<2>  cp = w[33] ? (ap_int<2>)1 : (ap_int<2>)-1;
         ap_int<2>  cl = w[34] ? (ap_int<2>)1 : (ap_int<2>)-1;
-        ap_uint<11> sidx = (ap_uint<11>)w(45, 35);
+        ap_uint<16> sidx = (ap_uint<16>)w(63, 48); // index packed at [63:48] (pack_tapped)
 
         ap_uint<32> p = (ap_uint<32>)(mi * mi) + (ap_uint<32>)(mq * mq);
         power_acc += p;
