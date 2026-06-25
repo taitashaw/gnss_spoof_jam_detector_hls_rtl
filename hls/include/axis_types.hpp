@@ -38,6 +38,25 @@ typedef ap_axiu<64, 0, 0, 0> axis_tapped_t;
 // Metric output word: 32b data; tlast marks the last word of a packet.
 typedef ap_axiu<32, 0, 0, 0> axis_metric_t;
 
+// Wide metric bundle: one packed beat per window (no flags/latency/status --
+// those are added by the RTL gnss_alert_packer). Field offsets below.
+typedef ap_axiu<512, 0, 0, 0> axis_metric_pkt_t;
+
+// Metric-bundle field offsets (LSB-first) -- shared by the kernel and its tb.
+#define B_WINDOW_O 0    // [31:0]
+#define B_POWER_O  32   // [79:32]   48b
+#define B_NOISE_O  80   // [111:80]
+#define B_CN0_O    112  // [143:112]
+#define B_CP_O     144  // [175:144]
+#define B_CE_O     176  // [207:176]
+#define B_CL_O     208  // [239:208]
+#define B_SYM_O    240  // [271:240]
+#define B_DOPP_O   272  // [319:272] 48b
+#define B_PJUMP_O  320  // [367:320] 48b
+#define B_SPOOF_O  368  // [399:368]
+#define B_JAM_O    400  // [431:400]
+#define B_SCNT_O   432  // [463:432]
+
 // ---- Tapped-stream field helpers (keep packing in ONE place) --------------
 static inline ap_uint<64> pack_tapped(int16_t mixed_i, int16_t mixed_q,
                                       int chip_e, int chip_p, int chip_l,
