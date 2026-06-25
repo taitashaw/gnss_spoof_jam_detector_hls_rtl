@@ -1,0 +1,48 @@
+# Build artifacts
+/build/*
+!/build/.gitkeep
+/results/*
+!/results/.gitkeep
+results/plots/
+results/summary.md
+vectors/*/input_iq.txt
+vectors/*/tapped_stream.txt
+vectors/*/expected_metrics.json
+vectors/*/metadata.json
+
+# Compiled C reference
+hls/src/gnss_ref_sim
+*.o
+*.out
+a.out
+
+# Vitis HLS
+gnss_metric_hls_prj/
+hls/vitis_hls/gnss_metric_hls_prj/
+vitis_hls.log
+*.jou
+
+# Vivado / XSim
+xsim.dir/
+.Xil/
+*.pb
+*.wdb
+*.jou
+*.log
+webtalk*.jou
+webtalk*.log
+xvlog*.log
+xelab*.log
+xsim*.log
+compile.log
+elaborate.log
+simulate.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editor
+*.swp
+.DS_Store
