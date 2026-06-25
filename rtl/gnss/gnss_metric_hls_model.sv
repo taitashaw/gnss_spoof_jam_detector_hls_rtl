@@ -123,17 +123,24 @@ module gnss_metric_hls_model
     logic [31:0] blk_min;
     logic [31:0] n_corr_e, n_corr_p, n_corr_l, n_sym, n_cn0, n_cn0ab;
     logic [31:0] n_noise;
+    logic signed [40:0] np_s, bm_s, nn_s; // signed IIR scratch (no unsigned mixing)
     logic [63:0] n_replica, n_collapse;
     logic [47:0] n_pjump;
     logic [31:0] n_spoof, n_jam;
     integer mb;
     always @(*) begin
-        // noise: min sub-block mean, smoothed
+        // noise: min sub-block mean, smoothed.
+        // The IIR is computed in signed locals ONLY -- mixing the unsigned
+        // noise_prev into the expression would make >>> a logical shift and
+        // wrap the negative delta. (Mirrors the int64 math in gnss_metric_ref.cpp.)
         blk_min = f_blk[0] >> SUBBLOCK_LOG2;
         for (mb=1; mb<NUM_SUBBLOCKS; mb=mb+1)
             if ((f_blk[mb] >> SUBBLOCK_LOG2) < blk_min) blk_min = f_blk[mb] >> SUBBLOCK_LOG2;
+        np_s = $signed({9'd0, noise_prev});
+        bm_s = $signed({9'd0, blk_min});
+        nn_s = np_s + ((bm_s - np_s) >>> NOISE_SMOOTH_SHIFT);
         if (noise_prev == 0) n_noise = blk_min;
-        else                 n_noise = noise_prev + (($signed({1'b0,blk_min}) - $signed({1'b0,noise_prev})) >>> NOISE_SMOOTH_SHIFT);
+        else                 n_noise = nn_s[31:0];
 
         n_corr_e = uabs32(f_IE) + uabs32(f_QE);
         n_corr_p = uabs32(f_IP) + uabs32(f_QP);
@@ -188,6 +195,10 @@ module gnss_metric_hls_model
 
             if (fire) begin
                 if (s_tap_tlast) begin
+`ifdef ME_DEBUG
+                    $display("[me] win=%0d noise_prev=%0d blk_min=%0d n_noise=%0d power_prev=%0d f_power=%0d",
+                             win_count, noise_prev, blk_min, n_noise, power_prev, f_power);
+`endif
                     // latch the full-window metrics
                     window_id         <= win_count;
                     power_estimate    <= f_power;
