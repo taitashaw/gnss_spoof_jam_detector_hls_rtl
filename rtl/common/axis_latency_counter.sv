@@ -32,7 +32,11 @@ module axis_latency_counter (
 
     output reg [31:0]  latency_first,
     output reg [31:0]  latency_total,
-    output reg [31:0]  window_cycles
+    output reg [31:0]  window_cycles,
+    // combinational running count since this window's first input beat; the
+    // alert packer samples this when it stamps the packet so the reported
+    // latency belongs to the current window (no off-by-one).
+    output wire [31:0] live_cycles
 );
     wire in_beat  = in_valid  && in_ready;
     wire out_beat = out_valid && out_ready;
@@ -41,6 +45,9 @@ module axis_latency_counter (
     reg        running;   // timer active
     reg        got_first; // captured first output beat of this window
     reg [31:0] timer;
+
+    // combinational running count for the current window (see port comment)
+    assign live_cycles = timer;
 
     always @(posedge clk) begin
         if (!rst_n) begin
