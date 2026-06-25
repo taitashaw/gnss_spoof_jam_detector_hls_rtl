@@ -1,0 +1,195 @@
+# GNSS Spoofing and Jamming Detection Accelerator (HLS + RTL)
+
+A streaming, fixed-point GNSS anomaly detection accelerator built the way real
+FPGA work should be shown: simulation-first, hardware-aware, and verified under
+cycle-level AXI4-Stream backpressure. It accepts signed complex I/Q samples and
+flags wideband jamming, tone jamming, C/N0 degradation, correlation-symmetry
+distortion, delayed spoof-like replicas, Doppler/phase-energy anomalies, and
+sudden power jumps.
+
+Author: John Bagshaw — GitHub: [`taitashaw`](https://github.com/taitashaw) —
+Repo: `https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl` — License: MIT.
+
+This is not a certified GPS receiver. It is a real-time FPGA accelerator that
+computes GNSS-relevant anomaly metrics over configurable sample windows, with the
+hardware/software partition chosen the way a production design would make it.
+
+---
+
+## 1. Project overview
+
+The accelerator ingests a 32-bit AXI4-Stream of signed I/Q (`I = tdata[31:16]`,
+`Q = tdata[15:0]`), mixes it to baseband with an RTL NCO, despreads it against a
+PRN-like code with early/prompt/late correlators, computes a battery of anomaly
+metrics in a streaming metric engine, and emits one metrics packet per window
+carrying per-metric values, a saturated spoof score, a saturated jam score,
+packed alert flags, and a cycle-accurate latency measurement.
+
+The design is deliberately split so each part is shown where it is strongest:
+
+- HLS where it is powerful — metric accumulation, fixed-point scoring.
+- RTL where it is mandatory — deterministic streaming, NCO/mixer, PRN/LFSR,
+  E/P/L tap alignment, threshold and alert packing, latency measurement.
+- XSim where reality is proven — valid/ready, backpressure, packet stability,
+  latency, and correctness against a single golden model.
+
+## 2. Why GNSS spoof/jam detection matters
+
+GNSS is the silent dependency under timing, navigation, and synchronization for
+power grids, telecom, finance, autonomy, and defense. It is also trivially
+attacked: a few dollars of RF can jam a band, and a software-defined radio can
+transmit a counterfeit constellation that walks a receiver off its true position
+or time. Detection has to happen at the front end, in real time, on every sample
+window, before a corrupted fix propagates into the system that trusts it. That is
+an FPGA problem: deterministic, low-latency, and streaming.
+
+## 3. Why FPGA acceleration matters
+
+A CPU or GPU can compute these metrics, but not with bounded per-window latency
+under a continuous high-rate sample stream and not without buffering that defeats
+the point. An FPGA processes the stream as it arrives, with a fixed pipeline,
+exact fixed-point arithmetic, and a hard latency bound that this project measures
+directly with a hardware latency counter rather than estimates. The whole design
+avoids floating point in every synthesizable path.
+
+## 4. Hardware bench alignment
+
+The intended bench is a Zynq UltraScale+ class part (ZCU104, `xczu7ev-ffvc1156-2-e`)
+with a GNSS RF front-end over FMC and a GPS antenna. The deliverable does not
+assume any of that exists yet: it runs entirely from generated synthetic I/Q and
+is structured so a real ADC/FMC stream replaces the synthetic input later without
+touching the metric engine. See `docs/hardware_bringup_notes.md`.
+
+## 5. Architecture
+
+```
+Synthetic or ADC I/Q Stream
+        |
+        v
+AXI4-Stream Skid Buffer
+        |
+        v
+RTL NCO Mixer
+        |
+        v
+RTL PRN / Early-Prompt-Late Generator
+        |
+        v
+HLS GNSS Metric Engine
+        |
+        v
+RTL Alert Packer + Latency Counter
+        |
+        v
+AXI4-Stream Metrics Output
+```
+
+## 6. HLS / RTL partitioning
+
+| Block | Domain | Why |
+|---|---|---|
+| Skid buffer, register slice | RTL | deterministic AXIS flow control |
+| NCO mixer | RTL | per-sample phase accumulator, LUT mix, saturation |
+| PRN LFSR + E/P/L tap | RTL | deterministic code generation and stream alignment |
+| Metric engine | HLS (RTL stand-in in sim) | accumulation and fixed-point scoring |
+| Alert packer | RTL | threshold compare, flag packing, latency fold-in |
+| Latency / packet counters | RTL | cycle-accurate measurement and health |
+
+The metric engine has two interchangeable implementations behind one identical
+port list: a behavioral SystemVerilog model (`rtl/gnss/gnss_metric_hls_model.sv`,
+the default so `make xsim` runs without Vitis HLS) and the Vitis-HLS-exported IP
+(`hls/src/gnss_metric_hls.cpp`). Swapping them is a one-line change in
+`vivado/compile_order.tcl`.
+
+## 7. Data formats
+
+- Input I/Q: AXI4-Stream, 32-bit `tdata` (`I s16` in `[31:16]`, `Q s16` in
+  `[15:0]`), `tlast` on the final sample of each window. Default window = 1024.
+- Tapped stream (mixer/PRN output to the metric engine): mixed I/Q (s16) plus
+  early/prompt/late chip signs plus sample index plus `tlast`.
+- Metrics output: one packed AXI4-Stream beat per window. Fields and offsets are
+  the single source of truth in `rtl/gnss/gnss_top_pkg.sv`.
+
+The exact metric definitions are in Section 3 of the in-repo spec and implemented
+identically in the C reference, the HLS kernel, the SystemVerilog model, and the
+Python generator. The golden definitions live in `hls/src/gnss_metric_ref.cpp`.
+
+## 8. How to run
+
+Lead with `make selfcheck` — it needs only `python3` (numpy) and `g++`, no Xilinx
+tools, and is the authoritative gate.
+
+```
+make selfcheck     # vectors -> C golden sim -> check -> summary  (no Xilinx tools)
+make hls-csim      # HLS kernel C-sim vs golden using Vitis ap_int headers (no synth)
+make hls           # full Vitis HLS C-sim + synth + export (needs vitis_hls on PATH)
+make xsim          # XSim cycle simulation of the 8-scenario matrix (needs Vivado)
+make check         # validate whatever results exist against expected flags/ranges
+make summary       # write results/summary.md
+make help          # list every target and what it requires
+```
+
+Toolchain assumptions (override as noted):
+
+- Python 3.10+ with numpy (matplotlib only for optional plots).
+- Vitis HLS 2022.2+ for `make hls` (`ap_int`, `ap_axiu`, `hls::stream`).
+- Vivado 2022.2+ with XSim for `make xsim`.
+- Target part `xczu7ev-ffvc1156-2-e`. Change it in ONE place: `PART` in
+  `vivado/compile_order.tcl` (RTL/XSim) and the `PART` line in
+  `hls/vitis_hls/run_hls.tcl` (HLS).
+
+## 9. Expected outputs
+
+`make selfcheck` writes `results/<scenario>/actual_metrics.txt` and a
+`results/summary.md` table. Each scenario asserts an exact alert-flag set:
+
+| Scenario | Alert flags |
+|---|---|
+| clean, backpressure | none |
+| cn0_drop | cn0_drop |
+| delayed_spoof | corr_asymmetry, spoof_score_high |
+| doppler_shift | cn0_drop, doppler_anomaly, spoof_score_high |
+| wideband_jam, tone_jam | high_power, cn0_drop, doppler_anomaly, spoof_score_high, jam_score_high |
+| mixed_attack | all six attack flags |
+
+## 10. Verification strategy
+
+A single golden model wins all ties: `hls/src/gnss_metric_ref.cpp`. The HLS kernel
+is checked TIGHT against it; XSim output is checked against loose metric ranges and
+exact alert flags; the Python generator's mix/PRN front-end is cross-checked
+bit-for-bit against the golden front-end. The XSim flow drives real AXI4-Stream
+backpressure (random and burst, seeded and reproducible) and proves the metrics
+are unchanged by it. Full detail in `docs/verification_strategy.md`.
+
+## 11. Known limitations
+
+Honest scope is in `docs/known_limitations.md`: this is not a certified GPS
+receiver, the PRN generator is PRN-like rather than a full C/A Gold code, C/N0 is
+a deterministic proxy, Doppler is a simplified anomaly proxy, and there is no live
+RF validation yet. No fabricated resource or timing numbers appear anywhere.
+
+## 12. Future hardware bring-up path
+
+`docs/hardware_bringup_notes.md` describes the ZCU104 PS/PL data path, the
+NT1065/FMC front-end work that is gated on real board documentation (FMC pinout,
+ADC sample format, clocking and reset constraints), and the smaller Zybo/Basys
+educational subsets. The single concrete next step is to replace the synthetic
+I/Q source with a captured NT1065 ADC frame at the same s16 I/Q contract and
+re-run the existing verification unchanged.
+
+## 13. Technical summary (LinkedIn-ready)
+
+I built a GNSS spoofing and jamming detector the way real FPGA work should be
+shown: not a clean functional demo, but a streaming HLS and RTL design verified
+under cycle-level AXI4-Stream backpressure. Signed complex I/Q streams in; an RTL
+NCO mixer and PRN early/prompt/late generator feed a fixed-point metric engine
+that computes correlation symmetry, a division-free C/N0 proxy, an FFT-free
+Doppler-energy proxy, and saturated spoof and jam scores; an RTL alert packer
+emits one metrics packet per window with packed alert flags and a cycle-accurate
+latency count. Every metric is defined once in a golden C reference and matched by
+the HLS kernel, the SystemVerilog model, and the Python generator. The point is
+the verification: the same eight scenarios pass under no stalls, random stalls,
+and burst backpressure with identical results, because valid/ready is correct —
+which is exactly the property a functional demo never proves. This is the kind of
+evidence ShawSilicon (shawsilicon.ai) builds for verifying FPGA and ASIC engineers
+before companies spend interview cycles.
