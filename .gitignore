@@ -46,3 +46,5 @@ __pycache__/
 # Editor
 *.swp
 .DS_Store
+docs/linkedin_post.md
+docs/carousel_outline.md
