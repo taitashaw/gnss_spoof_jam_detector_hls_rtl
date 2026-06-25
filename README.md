@@ -228,6 +228,22 @@ educational subsets. The single concrete next step is to replace the synthetic
 I/Q source with a captured NT1065 ADC frame at the same s16 I/Q contract and
 re-run the existing verification unchanged.
 
+## Roadmap — deferred phases
+
+What is done is stated plainly above: the golden model, the RTL datapath, full
+XSim cycle verification under backpressure, and Vitis HLS C synthesis with a real
+report. The following are planned next steps, not done yet:
+
+1. Vivado implementation (place-and-route) of the exported HLS IP plus the RTL, to
+   obtain post-implementation utilization and closed timing rather than the
+   current HLS-stage estimates.
+2. Vivado IP Integrator block design wiring the accelerator to the PS with AXI DMA
+   feeding I/Q in and draining the metrics packets, plus the AXI4-Lite shim over
+   `simple_reg_bank`.
+3. Bitstream generation and on-board bring-up on a ZCU104-class board.
+4. NT1065 FMC RF front-end capture replacing the synthetic I/Q source, gated on the
+   board documentation listed in `docs/hardware_bringup_notes.md`.
+
 ## 13. Technical summary (LinkedIn-ready)
 
 I built a GNSS spoofing and jamming detector the way real FPGA work should be

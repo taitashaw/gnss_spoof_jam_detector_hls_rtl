@@ -29,7 +29,7 @@ help:
 	@echo "  make check       Validate results against expected ranges + exact flags."
 	@echo "  make summary     Write results/summary.md."
 	@echo "  make plots       Optional matplotlib plots -> results/plots/*.png."
-	@echo "  make hls         Vitis HLS C-sim + synth + export (needs vitis_hls on PATH)."
+	@echo "  make hls         Vitis HLS C-sim + synth + export (auto-detects vitis_hls/vitis-run)."
 	@echo "  make hls-csim    HLS kernel C-sim vs golden via g++ + Vitis headers"
 	@echo "                   (validates the synthesizable source; no synthesis)."
 	@echo "  make xsim        XSim cycle sim for all scenarios (needs Vivado/xvlog)."
