@@ -23,6 +23,17 @@ All images here are produced from real runs, not mock-ups.
   faithful matplotlib rendering of the actual VCD signal data rather than a GUI
   screenshot (no fabricated screenshot is committed).
 
+  A real XSim GUI capture was attempted under a virtual framebuffer (Xvfb): the
+  Vivado simulator GUI does launch and load the design, but the wave window cannot
+  be brought to the foreground, focused, or zoomed to the backpressure interval
+  without interactive control — the simulator exposes no scriptable wave-focus or
+  zoom-to-range Tcl command, and no GUI-automation tool (xdotool) is available
+  headless. Every capture rendered the source/objects panel, not a legible wave
+  window. Rather than commit a screenshot that does not actually show the
+  waveform, the matplotlib render above (real VCD data) remains the waveform
+  artifact. To capture the XSim wave window interactively, open the design in the
+  Vivado GUI on a real display and apply `mixed_attack.wcfg`.
+
 - `mixed_attack.vcd` — the real value-change dump (open directly in GTKWave, or
   import into the Vivado/XSim waveform viewer).
 - `mixed_attack.wcfg` — a Vivado XSim waveform configuration naming the same

@@ -58,3 +58,9 @@ build/vivado_bd/
 *.sim/
 *.xpr
 *.str
+
+# Implementation project + bitstream (large/regenerable; reports are committed)
+build/vivado_bd_impl/
+*.bit
+*.pdi
+*.ltx

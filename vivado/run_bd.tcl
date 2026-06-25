@@ -22,8 +22,19 @@
 set REPO    [file normalize [file join [file dirname [info script]] ..]]
 set PART    xczu7ev-ffvc1156-2-e
 set IP_REPO $REPO/hls/vitis_hls/gnss_metric_hls_prj/sol1/impl/ip
-set PROJDIR $REPO/build/vivado_bd
 set BD      gnss_system_bd
+
+# EXPOSE_FMC=1 (default): expose external FMC/ADC AXI4-Stream ports (input switch
+#   + output broadcaster) alongside the DMA path. This variant validates and
+#   synthesizes, but the 512-bit external metrics bus makes it exceed the package
+#   I/O (686 ports), so it cannot be implemented to a bitstream.
+# EXPOSE_FMC=0: DMA-only deployable variant (no wide external I/O) -> this is the
+#   configuration that implements and bitstreams. Pass via -tclargs 0.
+set EXPOSE_FMC 1
+if {$argc >= 1} { set EXPOSE_FMC [lindex $argv 0] }
+set PROJDIR $REPO/build/vivado_bd
+if {!$EXPOSE_FMC} { set PROJDIR $REPO/build/vivado_bd_impl }
+puts "EXPOSE_FMC=$EXPOSE_FMC  PROJDIR=$PROJDIR"
 
 if {![file exists $IP_REPO/component.xml]} {
     puts "ERROR: exported HLS IP not found at $IP_REPO"
@@ -77,6 +88,18 @@ set_property -dict [list CONFIG.NUM_SI {1} CONFIG.NUM_MI {2}] $ctrl_smc
 set data_smc [create_bd_cell -type ip -vlnv xilinx.com:ip:smartconnect:* data_smc]
 set_property -dict [list CONFIG.NUM_SI {2} CONFIG.NUM_MI {1}] $data_smc
 
+# ---- AXIS path IP: input switch + output broadcaster (EXPOSE_FMC only) ----
+# in_switch selects the kernel's input between the AXI DMA (MM2S) and an external
+# FMC/ADC AXI4-Stream port (the direct front-end bypass). out_bcast duplicates the
+# metrics stream to both the AXI DMA (S2MM, for PS readback) and an external sink.
+if {$EXPOSE_FMC} {
+    set in_switch [create_bd_cell -type ip -vlnv xilinx.com:ip:axis_switch:* in_switch]
+    set_property -dict [list CONFIG.NUM_SI {2} CONFIG.NUM_MI {1} CONFIG.ROUTING_MODE {0} \
+        CONFIG.TDEST_WIDTH {0} CONFIG.ARB_ON_TLAST {1} CONFIG.TDATA_NUM_BYTES {8}] $in_switch
+    set out_bcast [create_bd_cell -type ip -vlnv xilinx.com:ip:axis_broadcaster:* out_bcast]
+    set_property -dict [list CONFIG.NUM_MI {2}] $out_bcast
+}
+
 # ---- reset ----
 set rst [create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:* proc_sys_reset_0]
 
@@ -101,6 +124,12 @@ connect_bd_net [get_bd_pins proc_sys_reset_0/interconnect_aresetn] \
 connect_bd_net [get_bd_pins proc_sys_reset_0/peripheral_aresetn] \
     [get_bd_pins axi_dma_0/axi_resetn] [get_bd_pins gnss_metric_hls_0/ap_rst_n]
 
+if {$EXPOSE_FMC} {
+    connect_bd_net $clk [get_bd_pins in_switch/aclk] [get_bd_pins out_bcast/aclk]
+    connect_bd_net [get_bd_pins proc_sys_reset_0/peripheral_aresetn] \
+        [get_bd_pins in_switch/aresetn] [get_bd_pins out_bcast/aresetn]
+}
+
 # ---- control path: PS M_AXI -> ctrl_smc -> {DMA lite, kernel ctrl} ----
 connect_bd_intf_net [get_bd_intf_pins zynq_ultra_ps_e_0/M_AXI_HPM0_FPD] [get_bd_intf_pins ctrl_smc/S00_AXI]
 connect_bd_intf_net [get_bd_intf_pins ctrl_smc/M00_AXI] [get_bd_intf_pins axi_dma_0/S_AXI_LITE]
@@ -111,9 +140,40 @@ connect_bd_intf_net [get_bd_intf_pins axi_dma_0/M_AXI_MM2S] [get_bd_intf_pins da
 connect_bd_intf_net [get_bd_intf_pins axi_dma_0/M_AXI_S2MM] [get_bd_intf_pins data_smc/S01_AXI]
 connect_bd_intf_net [get_bd_intf_pins data_smc/M00_AXI] [get_bd_intf_pins zynq_ultra_ps_e_0/S_AXI_HP0_FPD]
 
-# ---- AXI4-Stream datapath: MM2S -> kernel tap_in ; metric_out -> S2MM ----
-connect_bd_intf_net [get_bd_intf_pins axi_dma_0/M_AXIS_MM2S] [get_bd_intf_pins gnss_metric_hls_0/tap_in]
-connect_bd_intf_net [get_bd_intf_pins gnss_metric_hls_0/metric_out] [get_bd_intf_pins axi_dma_0/S_AXIS_S2MM]
+# ---- AXI4-Stream datapath ----
+if {$EXPOSE_FMC} {
+    # input: DMA MM2S + external FMC -> switch -> kernel tap_in
+    connect_bd_intf_net [get_bd_intf_pins axi_dma_0/M_AXIS_MM2S] [get_bd_intf_pins in_switch/S00_AXIS]
+    connect_bd_intf_net [get_bd_intf_pins in_switch/M00_AXIS] [get_bd_intf_pins gnss_metric_hls_0/tap_in]
+    # output: kernel metric_out -> broadcaster -> {DMA S2MM, external sink}
+    connect_bd_intf_net [get_bd_intf_pins gnss_metric_hls_0/metric_out] [get_bd_intf_pins out_bcast/S_AXIS]
+    connect_bd_intf_net [get_bd_intf_pins out_bcast/M00_AXIS] [get_bd_intf_pins axi_dma_0/S_AXIS_S2MM]
+
+    # external ports: direct front-end streaming path alongside the DMA path.
+    # The external AXIS ports need an associated external clock port; expose the
+    # PL-sourced clock and reset (explicit ports) and associate the streams with it.
+    create_bd_port -dir O -type clk fmc_clk
+    connect_bd_net [get_bd_ports fmc_clk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
+    create_bd_port -dir O -type rst fmc_aresetn
+    connect_bd_net [get_bd_ports fmc_aresetn] [get_bd_pins proc_sys_reset_0/peripheral_aresetn]
+
+    make_bd_intf_pins_external -name fmc_iq_in       [get_bd_intf_pins in_switch/S01_AXIS]
+    make_bd_intf_pins_external -name metrics_out_ext [get_bd_intf_pins out_bcast/M01_AXIS]
+
+    # Set the external clock port to the ACHIEVED PL clock frequency so it matches
+    # the driving net (the port-default 100 MHz would otherwise mismatch). The AXIS
+    # port FREQ_HZ and TDATA width are read-only and propagate from the associated
+    # clock and the connected internal pins.
+    set plfreq [get_property CONFIG.FREQ_HZ [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]]
+    if {$plfreq eq "" || $plfreq <= 10000000} { set plfreq 96968727 }
+    puts "ACHIEVED_PL_FREQ_HZ=$plfreq"
+    set_property CONFIG.FREQ_HZ $plfreq [get_bd_ports fmc_clk]
+    set_property CONFIG.ASSOCIATED_BUSIF {fmc_iq_in:metrics_out_ext} [get_bd_ports fmc_clk]
+} else {
+    # DMA-only deployable datapath (no external I/O -> implements + bitstreams)
+    connect_bd_intf_net [get_bd_intf_pins axi_dma_0/M_AXIS_MM2S] [get_bd_intf_pins gnss_metric_hls_0/tap_in]
+    connect_bd_intf_net [get_bd_intf_pins gnss_metric_hls_0/metric_out] [get_bd_intf_pins axi_dma_0/S_AXIS_S2MM]
+}
 
 # ---- addresses + validate ----
 assign_bd_address

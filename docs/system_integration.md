@@ -43,6 +43,27 @@ DDR <-> PS S_AXI_HP0 <-> data_smc <-> AXI DMA  --MM2S(64b)-->  kernel tap_in
 - The DMA runs in direct-register mode (no scatter-gather); MM2S and S2MM stream
   widths are set independently (64-bit in, 512-bit out) to match the kernel ports.
 
+### Direct front-end streaming path (FMC/ADC bypass), alongside the DMA path
+
+The DMA path is not the only way in and out. An AXI4-Stream switch on the input
+and a broadcaster on the output expose external top-level ports so a real FMC/ADC
+front-end can stream straight into the accelerator, in addition to the DMA:
+
+- `fmc_iq_in` (external 64-bit AXI4-Stream) is a second slave on the input switch
+  (`in_switch`); the switch selects between the DMA `MM2S` feed and this external
+  feed, so the kernel can be driven either from DDR by the PS or directly from the
+  front-end with no DDR round-trip.
+- `metrics_out_ext` (external 512-bit AXI4-Stream) is a second master on the output
+  broadcaster (`out_bcast`); every metrics packet goes to both the DMA `S2MM` (PS
+  readback) and this external port (a downstream sink such as a logging or alarm
+  block).
+- `fmc_clk` and `fmc_aresetn` are the PL-sourced clock and reset for that external
+  streaming domain (the external AXI4-Stream ports are associated with `fmc_clk`).
+
+This keeps the full DMA datapath intact while adding the lower-latency direct path
+the real RF bench uses. The block design still validates with zero critical
+warnings with both paths present.
+
 ### How the s16 I/Q AXI4-Stream contract maps in
 
 The system-level I/Q contract is unchanged: `I = tdata[31:16]`, `Q = tdata[15:0]`,

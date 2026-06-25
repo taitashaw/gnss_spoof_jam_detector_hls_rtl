@@ -243,26 +243,38 @@ The exported metric IP is integrated into a ZCU104-class Zynq UltraScale+ system
 as a reproducible Vivado IP Integrator block design (`vivado/run_bd.tcl`, batch).
 The PS drives an AXI DMA that streams data into the kernel (MM2S to `tap_in`,
 64-bit) and writes the 512-bit metrics packets back (`metric_out` to S2MM), with
-the control plane over AXI4-Lite. The block design **validates with zero critical
-warnings** and **synthesizes** to a real post-synthesis utilization on the
-`xczu7ev`: LUTs 11035 (4.79%), FF 17757 (3.85%), BRAM 10 tiles (3.21%), DSP 4
-(0.23%) — verbatim in `docs/synth/system_synth_util.rpt`. Full detail and the
-PS/PL datapath are in `docs/system_integration.md`.
+the control plane over AXI4-Lite. The default variant also exposes external
+`fmc_iq_in` / `metrics_out_ext` AXI4-Stream ports (an input switch + output
+broadcaster) for a direct FMC/ADC front-end path alongside the DMA. The block
+design **validates with zero critical warnings**. Full detail and the PS/PL
+datapath are in `docs/system_integration.md`.
 
 ![GNSS system block design](docs/images/gnss_block_design.png)
 
-Status: block design validated and synthesized; not yet flashed to a board.
+The design was **placed, routed, and a bitstream generated** (DMA-only deployable
+variant — the external 512-bit metrics bus would exceed the package I/O). Real
+post-implementation results on the `xczu7ev`, verbatim in
+`docs/implementation.md` / `docs/synth/impl_*.rpt`:
+
+| Metric | Value |
+|---|---|
+| Timing | WNS +4.484 ns, TNS 0.0, 0 failing endpoints — closes |
+| LUT / FF | 10044 (4.36%) / 16882 (3.66%) |
+| BRAM / DSP | 10 tiles (3.21%) / 4 (0.23%) |
+| Bitstream | generated (`write_bitstream Complete!`) |
+
+Status: block design validated, synthesized, implemented (timing closed), and
+bitstream generated; **not yet flashed to a board.**
 
 ## Roadmap — deferred phases
 
 What is done is stated plainly above: the golden model, the RTL datapath, full
 XSim cycle verification under backpressure, Vitis HLS C synthesis, and the
-validated, synthesized Zynq UltraScale+ block design. The following are planned
-next steps, not done yet:
+validated Zynq UltraScale+ block design that is implemented (timing closed) with a
+generated bitstream. The following are pending hardware, not done yet:
 
-1. Vivado implementation (place-and-route), timing closure, and bitstream
-   generation for the integrated system.
-2. On-board bring-up on a ZCU104-class board.
+1. On-board bring-up on a ZCU104-class board (programming the device over JTAG).
+2. ILA / hardware debug verification of the live datapath.
 3. NT1065 FMC RF front-end capture replacing the synthetic I/Q source, gated on the
    board documentation listed in `docs/hardware_bringup_notes.md`.
 
