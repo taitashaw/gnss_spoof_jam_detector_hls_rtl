@@ -48,3 +48,13 @@ __pycache__/
 .DS_Store
 docs/linkedin_post.md
 docs/carousel_outline.md
+
+# Vivado IP Integrator / project (heavy, regenerable via vivado/run_bd.tcl)
+build/vivado_bd/
+*.cache/
+*.hw/
+*.runs/
+*.gen/
+*.sim/
+*.xpr
+*.str

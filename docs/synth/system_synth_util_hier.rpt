@@ -1,0 +1,39 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2025.2 (lin64) Build 6299465 Fri Nov 14 12:34:56 MST 2025
+| Date         : Thu Jun 25 13:21:59 2026
+| Host         : jotshawlinux-Legion running 64-bit Ubuntu 24.04.4 LTS
+| Command      : report_utilization -hierarchical -hierarchical_depth 3 -file /home/jotshawlinux/gnss_spoof_jam_detector_hls_rtl/docs/synth/system_synth_util_hier.rpt
+| Design       : gnss_system_bd_wrapper
+| Device       : xczu7ev-ffvc1156-2-e
+| Speed File   : -2
+| Design State : Synthesized
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Utilization Design Information
+
+Table of Contents
+-----------------
+1. Utilization by Hierarchy
+
+1. Utilization by Hierarchy
+---------------------------
+
++------------------------+---------------------------------------------------------------------------+------------+------------+---------+------+-------+--------+--------+------+------------+
+|        Instance        |                                   Module                                  | Total LUTs | Logic LUTs | LUTRAMs | SRLs |  FFs  | RAMB36 | RAMB18 | URAM | DSP Blocks |
++------------------------+---------------------------------------------------------------------------+------------+------------+---------+------+-------+--------+--------+------+------------+
+| gnss_system_bd_wrapper |                                                                     (top) |      11035 |       9295 |    1546 |  194 | 17757 |      9 |      2 |    0 |          4 |
+|   gnss_system_bd_i     |                                                            gnss_system_bd |      11035 |       9295 |    1546 |  194 | 17757 |      9 |      2 |    0 |          4 |
+|     zynq_ultra_ps_e_0  |                                        gnss_system_bd_zynq_ultra_ps_e_0_0 |        264 |        264 |       0 |    0 |     0 |      0 |      0 |    0 |          0 |
+|       inst             | gnss_system_bd_zynq_ultra_ps_e_0_0_zynq_ultra_ps_e_v3_5_8_zynq_ultra_ps_e |        264 |        264 |       0 |    0 |     0 |      0 |      0 |    0 |          0 |
+|     axi_dma_0          |                                                gnss_system_bd_axi_dma_0_0 |       4333 |       4126 |      52 |  155 |  6659 |      9 |      2 |    0 |          0 |
+|       U0               |                                        gnss_system_bd_axi_dma_0_0_axi_dma |       4333 |       4126 |      52 |  155 |  6659 |      9 |      2 |    0 |          0 |
+|     ctrl_smc           |                                                 gnss_system_bd_ctrl_smc_0 |        761 |        760 |       0 |    1 |   895 |      0 |      0 |    0 |          0 |
+|       inst             |                                         gnss_system_bd_ctrl_smc_0_bd_77ca |        761 |        760 |       0 |    1 |   895 |      0 |      0 |    0 |          0 |
+|     data_smc           |                                                 gnss_system_bd_data_smc_0 |       3720 |       2192 |    1494 |   34 |  7764 |      0 |      0 |    0 |          0 |
+|       inst             |                                         gnss_system_bd_data_smc_0_bd_d7d5 |       3720 |       2192 |    1494 |   34 |  7764 |      0 |      0 |    0 |          0 |
+|     gnss_metric_hls_0  |                                        gnss_system_bd_gnss_metric_hls_0_0 |       1938 |       1935 |       0 |    3 |  2399 |      0 |      0 |    0 |          4 |
+|       inst             |                        gnss_system_bd_gnss_metric_hls_0_0_gnss_metric_hls |       1938 |       1935 |       0 |    3 |  2399 |      0 |      0 |    0 |          4 |
++------------------------+---------------------------------------------------------------------------+------------+------------+---------+------+-------+--------+--------+------+------------+
+
+

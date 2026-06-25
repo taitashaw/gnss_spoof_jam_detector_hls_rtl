@@ -237,20 +237,33 @@ educational subsets. The single concrete next step is to replace the synthetic
 I/Q source with a captured NT1065 ADC frame at the same s16 I/Q contract and
 re-run the existing verification unchanged.
 
+## System Integration
+
+The exported metric IP is integrated into a ZCU104-class Zynq UltraScale+ system
+as a reproducible Vivado IP Integrator block design (`vivado/run_bd.tcl`, batch).
+The PS drives an AXI DMA that streams data into the kernel (MM2S to `tap_in`,
+64-bit) and writes the 512-bit metrics packets back (`metric_out` to S2MM), with
+the control plane over AXI4-Lite. The block design **validates with zero critical
+warnings** and **synthesizes** to a real post-synthesis utilization on the
+`xczu7ev`: LUTs 11035 (4.79%), FF 17757 (3.85%), BRAM 10 tiles (3.21%), DSP 4
+(0.23%) — verbatim in `docs/synth/system_synth_util.rpt`. Full detail and the
+PS/PL datapath are in `docs/system_integration.md`.
+
+![GNSS system block design](docs/images/gnss_block_design.png)
+
+Status: block design validated and synthesized; not yet flashed to a board.
+
 ## Roadmap — deferred phases
 
 What is done is stated plainly above: the golden model, the RTL datapath, full
-XSim cycle verification under backpressure, and Vitis HLS C synthesis with a real
-report. The following are planned next steps, not done yet:
+XSim cycle verification under backpressure, Vitis HLS C synthesis, and the
+validated, synthesized Zynq UltraScale+ block design. The following are planned
+next steps, not done yet:
 
-1. Vivado implementation (place-and-route) of the exported HLS IP plus the RTL, to
-   obtain post-implementation utilization and closed timing rather than the
-   current HLS-stage estimates.
-2. Vivado IP Integrator block design wiring the accelerator to the PS with AXI DMA
-   feeding I/Q in and draining the metrics packets, plus the AXI4-Lite shim over
-   `simple_reg_bank`.
-3. Bitstream generation and on-board bring-up on a ZCU104-class board.
-4. NT1065 FMC RF front-end capture replacing the synthetic I/Q source, gated on the
+1. Vivado implementation (place-and-route), timing closure, and bitstream
+   generation for the integrated system.
+2. On-board bring-up on a ZCU104-class board.
+3. NT1065 FMC RF front-end capture replacing the synthetic I/Q source, gated on the
    board documentation listed in `docs/hardware_bringup_notes.md`.
 
 ## 13. Technical summary
