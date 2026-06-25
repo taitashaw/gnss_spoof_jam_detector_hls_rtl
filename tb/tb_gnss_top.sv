@@ -161,6 +161,19 @@ module tb_gnss_top
         fout = $fopen(outfile, "w");
         if (fout == 0) begin $display("FAIL: cannot open %s for write", outfile); $finish; end
 
+        // Optional VCD dump of the AXIS handshake + tapped/metrics signals so a
+        // real waveform can be rendered or opened in the Vivado GUI. Enable with
+        // +DUMPVCD (+VCDFILE=<path>). Dumps only the handshake-relevant nets.
+        if ($test$plusargs("DUMPVCD")) begin
+            string vp;
+            if (!$value$plusargs("VCDFILE=%s", vp)) vp = "wave.vcd";
+            $dumpfile(vp);
+            $dumpvars(0, s_tvalid, s_tready, s_tlast, s_tdata);
+            $dumpvars(0, m_tvalid, m_tready, m_tlast);
+            $dumpvars(0, dut.tap_tvalid, dut.tap_tready, dut.tap_tlast);
+            $dumpvars(0, m_tdata[15:0]);
+        end
+
         pkt_count = 0;
         repeat (6) @(posedge clk);
         rst_n = 1;

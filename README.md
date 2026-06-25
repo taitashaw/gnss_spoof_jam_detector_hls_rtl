@@ -189,6 +189,20 @@ raw reports in `docs/synth/`); none are estimated by hand:
 These are post-C-synthesis estimates; post-implementation timing closure is a
 deferred phase (see the roadmap).
 
+## Verification
+
+![XSim waveform under burst backpressure](docs/images/waveform_mixed_attack.png)
+
+A timing diagram rendered from the real XSim value-change dump of the
+`mixed_attack` scenario under burst backpressure (seed `0xC0FFEE`,
+`scripts/render_wave.py` over `docs/images/mixed_attack.vcd`). The shaded interval
+is a metrics-output backpressure event: `m_axis_tvalid` is held while
+`m_axis_tready = 0` and `tdata` stays stable, exactly the AXIS rule a functional C
+simulation cannot exercise. The input handshake, the tapped stream into the metric
+engine, and the packet `tlast` are all visible. Regenerate with `make waves`; open
+`mixed_attack.vcd` / `mixed_attack.wcfg` in the Vivado GUI to inspect interactively
+(see `docs/images/README.md`).
+
 ## 10. Verification strategy
 
 A single golden model wins all ties: `hls/src/gnss_metric_ref.cpp`. The HLS kernel

@@ -17,7 +17,7 @@ PART        ?= xczu7ev-ffvc1156-2-e
 
 .DEFAULT_GOAL := help
 
-.PHONY: help vectors selfcheck refsim check summary plots hls hls-csim xsim all clean
+.PHONY: help vectors selfcheck refsim check summary plots hls hls-csim xsim waves all clean
 
 help:
 	@echo "GNSS Spoof/Jam Detector -- make targets"
@@ -33,6 +33,7 @@ help:
 	@echo "  make hls-csim    HLS kernel C-sim vs golden via g++ + Vitis headers"
 	@echo "                   (validates the synthesizable source; no synthesis)."
 	@echo "  make xsim        XSim cycle sim for all scenarios (needs Vivado/xvlog)."
+	@echo "  make waves       Regenerate the mixed_attack VCD + waveform PNG (needs Vivado)."
 	@echo "  make all         selfcheck, then hls + xsim if their tools are present."
 	@echo "  make clean       Remove build/ and results/ artifacts."
 	@echo ""
@@ -69,6 +70,9 @@ xsim: vectors
 	@command -v xvlog >/dev/null 2>&1 || { \
 	  echo "ERROR: xvlog/Vivado not on PATH. Install Vivado 2022.2+ or run 'make selfcheck'."; exit 1; }
 	@bash $(SCRIPTS)/run_xsim.sh
+
+waves: vectors
+	@bash $(SCRIPTS)/run_waves.sh
 
 all: selfcheck
 	@echo ""
