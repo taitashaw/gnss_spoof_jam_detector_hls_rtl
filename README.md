@@ -1,5 +1,7 @@
 # GNSS Spoofing and Jamming Detection Accelerator (HLS + RTL)
 
+![selfcheck](https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl/actions/workflows/selfcheck.yml/badge.svg)
+
 A streaming, fixed-point GNSS anomaly detection accelerator built the way real
 FPGA work should be shown: simulation-first, hardware-aware, and verified under
 cycle-level AXI4-Stream backpressure. It accepts signed complex I/Q samples and
