@@ -32,11 +32,20 @@ here are real boundaries, not defects.
   The path to real capture is described in `hardware_bringup_notes.md` and is gated
   on board documentation.
 
-- No fabricated resource or timing numbers. Where full Vitis HLS synthesis was not
-  run in a given environment, no area, frequency, or latency-in-nanoseconds figure
-  is invented. The only latency reported is the cycle count measured directly by
-  `axis_latency_counter` in XSim, and the `latency_report_template.md` is an empty
-  structured template to be filled from real runs.
+- No fabricated resource or timing numbers. Vitis HLS C synthesis was run (Vitis
+  HLS 2025.2 via `vitis-run --mode hls`); the resulting utilization (DSP 4, FF
+  1735, LUT 4026, BRAM 0), the 5.00 ns clock target met at an estimated 3.625 ns,
+  and the II = 1 accumulation loop are reported verbatim from the tool in
+  `docs/synthesis_report.md` with the raw reports under `docs/synth/`. These are
+  post-C-synthesis estimates; final post-implementation utilization and timing
+  closure require Vivado place-and-route, which is a deferred phase. The
+  cycle-accurate per-window latency is measured directly by `axis_latency_counter`
+  in XSim, and `latency_report_template.md` is a structured template for those
+  measured runs.
+
+- Not yet implemented on hardware. There is no Vivado IP Integrator block design,
+  no bitstream, and no on-board bring-up yet. These are deferred phases listed in
+  the README roadmap, gated on the NT1065 FMC board documentation.
 
 - The thresholds and score weights are tuned on the eight reference scenarios to
   separate them cleanly. They are a defensible default starting point, not

@@ -98,14 +98,17 @@ mixer phase determinism, and the PRN handshake and restart determinism.
 
 ## Verified results on this machine
 
-Reported honestly from real runs (Vivado 2025.2 XSim, g++ 13 for the golden and
-HLS C-sim; classic `vitis_hls` was not on PATH in this install, so full HLS
-synthesis was not run and no synthesis or timing numbers are claimed):
+Reported honestly from real runs (Vivado 2025.2 XSim and Vitis HLS 2025.2):
 
 - `make selfcheck`: 8/8 scenarios pass; front-end cross-check bit-exact.
 - XSim: 8/8 pass; metrics bit-exact versus golden; identical under random and
   burst backpressure; zero protocol-assertion failures; measured latency ranged
   from 1021 cycles (no stalls) to 2038 cycles (burst backpressure).
-- HLS kernel C-sim (real Vitis `ap_int`/`ap_axiu`/`hls::stream` headers): 8/8 pass
-  versus golden.
+- Vitis HLS C synthesis (`vitis-run --mode hls`): C simulation passed with 0
+  errors over all eight scenarios; the accumulation loop achieves II = 1; the
+  5.00 ns clock target is met at an estimated 3.625 ns; utilization is DSP 4, FF
+  1735, LUT 4026, BRAM 0. Verbatim tool output is in `docs/synthesis_report.md`.
 - Unit testbenches: skid buffer, NCO mixer, and PRN generator all pass.
+
+Post-implementation timing closure and on-board bring-up are deferred phases
+(README roadmap); no post-place-and-route numbers are claimed.

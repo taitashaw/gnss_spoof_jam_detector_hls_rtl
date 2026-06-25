@@ -60,8 +60,6 @@ selfcheck: vectors refsim check summary
 
 # ---- Tool-dependent flows (fail honestly if tools absent) ------------------
 hls:
-	@command -v vitis_hls >/dev/null 2>&1 || { \
-	  echo "ERROR: vitis_hls not on PATH. Install Vitis HLS 2022.2+ or run 'make selfcheck'."; exit 1; }
 	@bash $(SCRIPTS)/run_hls.sh $(PART)
 
 hls-csim: vectors
@@ -74,7 +72,8 @@ xsim: vectors
 
 all: selfcheck
 	@echo ""
-	@if command -v vitis_hls >/dev/null 2>&1; then \
+	@if command -v vitis_hls >/dev/null 2>&1 || command -v vitis-run >/dev/null 2>&1 \
+	    || ls /tools/Xilinx/*/Vitis/bin/vitis-run /opt/Xilinx/*/Vitis/bin/vitis-run >/dev/null 2>&1; then \
 	  echo "== Vitis HLS detected: running make hls =="; $(MAKE) hls || true; \
 	else echo "== Vitis HLS not found: trying HLS C-sim via headers (make hls-csim) =="; \
 	  $(MAKE) hls-csim || echo "   (hls-csim skipped: no Vitis headers)"; fi
