@@ -266,6 +266,29 @@ post-implementation results on the `xczu7ev`, verbatim in
 Status: block design validated, synthesized, implemented (timing closed), and
 bitstream generated; **not yet flashed to a board.**
 
+## Real-Data Validation (TEXBAT)
+
+The 8 synthetic scenarios remain the primary functional suite. As an additional
+check on **real recorded GPS spoofing data** (not synthetic, not re-transmitted),
+the pipeline was run over two scenarios from the Texas Spoofing Test Battery
+(TEXBAT, UT Austin Radionavigation Lab; Humphreys et al., ION GNSS+ 2012): **ds2**
+(overpowered time-push) and **ds7** (matched-power SCER, the hardest class). Clean
+and post-onset slices (128 windows each) were read directly from the local ~43 GB
+`.bin` files by byte offset — the files are never loaded whole and **never
+committed** (referenced by path + SHA256 + citation).
+
+On the real data, both the C reference and XSim (bit-exact) show:
+
+- **ds2:** `power_estimate` +225% and `doppler_energy` +158% at the attack — a
+  clear response to the overpowered spoofer.
+- **ds7:** all metrics move under 8% — the matched-power SCER attack is not clearly
+  flagged. ds7 is decisively harder than ds2.
+
+Honest scope: this is a pre-tracking anomaly accelerator with a PRN-like LFSR, not
+a C/A tracking receiver, so the correlation metrics do not provide despread-based
+discrimination (full C/A acquisition is the next step). Full method, tables, the
+null result, and provenance are in `docs/texbat_validation.md`.
+
 ## Roadmap — deferred phases
 
 What is done is stated plainly above: the golden model, the RTL datapath, full

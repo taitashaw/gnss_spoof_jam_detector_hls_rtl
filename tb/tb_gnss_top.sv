@@ -26,7 +26,7 @@
 module tb_gnss_top
     import gnss_top_pkg::*;
 ;
-    localparam int MAXSAMP = 1 << 16;
+    localparam int MAXSAMP = 1 << 18; // holds up to 256 windows of 1024 samples
 
     logic clk = 0, rst_n = 0;
     always #5 clk = ~clk;

@@ -64,3 +64,10 @@ build/vivado_bd_impl/
 *.bit
 *.pdi
 *.ltx
+
+# TEXBAT real recorded data -- multi-GB .bin files are NEVER committed
+# (referenced by path + SHA256 + citation in docs/texbat_validation.md)
+*.bin
+/texbat/
+vectors/texbat_*/
+results/texbat_*/
