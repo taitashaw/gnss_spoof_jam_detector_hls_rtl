@@ -152,6 +152,43 @@ Toolchain assumptions (override as noted):
 | wideband_jam, tone_jam | high_power, cn0_drop, doppler_anomaly, spoof_score_high, jam_score_high |
 | mixed_attack | all six attack flags |
 
+## Results
+
+Both charts are produced by `make plots` from the real `make selfcheck` / `make xsim`
+run over the eight deterministic scenarios (seed `0xC0FFEE`). The C golden model,
+the HLS kernel, and the SystemVerilog model all produce these same values.
+
+![Spoof and jam scores per scenario](docs/images/scores_by_scenario.png)
+
+Spoof and jam scores per scenario against the alert threshold (500). Clean and
+backpressure sit near zero; each attack lifts its score past the threshold, and
+mixed_attack drives the highest spoof score.
+
+![Clean versus attack metric signatures](docs/images/metrics_by_scenario.png)
+
+Clean-versus-attack metric signatures with the alert thresholds drawn in. Left:
+power and Doppler energy on a log scale — jamming dominates absolute power. Right:
+correlation symmetry (the spoof signature, high only for delayed_spoof and
+mixed_attack) and the C/N0 proxy line, which collapses under jamming, Doppler, and
+C/N0 degradation while staying high for clean and backpressure.
+
+## Synthesis (real, from Vitis HLS 2025.2)
+
+`make hls` ran C simulation, C synthesis, and RTL IP export on this machine. The
+numbers below are copied verbatim from the tool report (`docs/synthesis_report.md`,
+raw reports in `docs/synth/`); none are estimated by hand:
+
+| Metric | Value |
+|---|---|
+| C simulation | all 8 scenarios pass, 0 errors |
+| ACC_LOOP initiation interval | 1 (target 1), pipelined |
+| Clock target / estimated | 5.00 ns / 3.625 ns (uncertainty 1.35 ns) |
+| DSP / FF / LUT / BRAM | 4 / 1735 / 4026 / 0 |
+| Target part | xczu7ev-ffvc1156-2-e |
+
+These are post-C-synthesis estimates; post-implementation timing closure is a
+deferred phase (see the roadmap).
+
 ## 10. Verification strategy
 
 A single golden model wins all ties: `hls/src/gnss_metric_ref.cpp`. The HLS kernel
