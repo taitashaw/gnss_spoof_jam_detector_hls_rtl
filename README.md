@@ -253,7 +253,7 @@ report. The following are planned next steps, not done yet:
 4. NT1065 FMC RF front-end capture replacing the synthetic I/Q source, gated on the
    board documentation listed in `docs/hardware_bringup_notes.md`.
 
-## 13. Technical summary (LinkedIn-ready)
+## 13. Technical summary
 
 I built a GNSS spoofing and jamming detector the way real FPGA work should be
 shown: not a clean functional demo, but a streaming HLS and RTL design verified
