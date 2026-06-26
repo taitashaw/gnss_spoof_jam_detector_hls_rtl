@@ -40,13 +40,44 @@ block count up; the FFT IP cost grows with FFT length, and the latency with N_BL
 
 ## C-simulation status (honest)
 
-`csim_design` did **not** pass: the Xilinx FFT bit-accurate C-model aborts with a
-floating-point exception under the scaled-FFT configuration
-(`hls_fft.h get_status` / the model's internal scaling), independent of the kernel's
-own logic. The TCL catches this and proceeds to csynth, which is the resource gate.
-The detector algorithm is validated separately by the Python golden
-(`scripts/dbzp_acq.py` / `scripts/ddmap_hls_vectors.py`): at the matched 2-samples/
-chip config the golden gives the correct-PRN peak at the injected phase, the
-wrong-PRN peak ~47× lower, and ds7-spoofed distortion (0.80) above clean (0.33). No
-fixed-point csim agreement number is claimed here; only the real csynth numbers are.
-The FFT C-model FPE is the next item to resolve for a fixed-point-vs-golden csim.
+`csim_design` did **not** pass. The Xilinx FFT bit-accurate C-model
+(`hls_fft.h`) aborts with an integer-divide `SIGFPE` ("child killed: floating-point
+exception") within ~2 s, **before any testbench output prints** — i.e. inside the
+FFT model's first invocation, not in the kernel's own logic (the kernel has no
+runtime-zero integer division). Workarounds attempted, in order:
+
+1. **Scaled mode** (the config that synthesizes): FPE.
+2. **Block-floating-point mode** (`scaling_opt = block_floating_point`,
+   `config_width = 8`): the FFT model still FPEs, AND it forces the classic
+   streaming-config API, which **fails synthesis** here — that API requires the FFT
+   in/out arrays to be consumed as sequential streams, incompatible with this
+   kernel's random-access correlation arrays (`Failed to implement stream interface
+   on ... code_fd/blk_fd/corr`). So BFP cannot be used without restructuring the
+   detector algorithm (which the task forbids).
+3. **Disable FP-exception trapping** in the TB (`fedisableexcept(FE_ALL_EXCEPT)`):
+   no effect — confirming an integer-divide SIGFPE (a hardware trap), not a
+   trappable FP op.
+
+This is a **documented `hls_fft.h` bit-accurate C-model limitation** under this
+configuration on this install. It does NOT affect synthesis: csynth generates the
+real FFT RTL and the resource/timing numbers above.
+
+## Co-simulation status (honest)
+
+`cosim_design` also **could not run**, blocked by the same C-model FPE.
+cosim_design first runs the C testbench to generate the input/golden test vectors,
+and that step calls the kernel's C model (FFT C-model) -> SIGFPE ->
+`ERROR: [COSIM 212-320] C TB testing failed, stop generating test vectors` ->
+`C/RTL co-simulation finished: FAIL`. So the C testbench passing is a hard
+prerequisite for cosim that could not be fixed without either the vendor model
+working or restructuring the kernel; cosim verification of the synthesized RTL is
+therefore not available here. Stated plainly: **cosim did not run.**
+
+## Verification that IS available
+
+The detector algorithm is validated by the Python golden
+(`scripts/dbzp_acq.py` / `scripts/ddmap_hls_vectors.py`), which the kernel mirrors
+at the matched 2-samples/chip config: correct-PRN peak at the injected phase,
+wrong-PRN peak ~47x lower, ds7-spoofed distortion 0.80 > clean 0.33. The kernel's
+synthesizability and resource/timing cost are proven by the real csynth above. No
+fixed-point csim/cosim agreement number is claimed, because none was produced.

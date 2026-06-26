@@ -10,6 +10,10 @@
 //
 // Pass the repo root as argv[1] (run_hls.tcl supplies it).
 // ============================================================================
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE   // for fedisableexcept (glibc)
+#endif
+#include <fenv.h>
 #include "hls_stream.h"
 #include "ap_int.h"
 #include "ap_axi_sdata.h"
@@ -59,6 +63,9 @@ static Ref load_ref(const std::string &path) {
 }
 
 int main(int argc, char **argv) {
+#ifdef FE_ALL_EXCEPT
+    fedisableexcept(FE_ALL_EXCEPT);   // don't trap FP exceptions raised inside the FFT C-model
+#endif
     std::string root = (argc > 1) ? argv[1] : ".";
     std::string dir = root + "/vectors/ddmap_hls/";
     int fails = 0;

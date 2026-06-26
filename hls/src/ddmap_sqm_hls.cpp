@@ -37,6 +37,10 @@ struct fft_cfg : hls::ip_fft::params_t {
     static const unsigned input_width    = 16;
     static const unsigned output_width   = 16;
     static const unsigned config_width   = 16;
+    // scaled mode: required by the random-access new-API fft (BFP needs the classic
+    // streaming API, which is incompatible with this kernel's random-access
+    // correlation arrays). The scaled-mode FFT bit-accurate C-model aborts csim with
+    // an integer-divide SIGFPE on this install (documented; synthesis is unaffected).
     static const unsigned scaling_opt    = hls::ip_fft::scaled;
     static const unsigned ordering_opt   = hls::ip_fft::natural_order;
     static const unsigned phase_factor_width = 16;
@@ -47,14 +51,15 @@ typedef ap_fixed<16, 1>  fft_data_t;
 typedef std::complex<fft_data_t> cpx_t;
 typedef ap_fixed<48, 24> acc_t;            // coherent accumulator (wide)
 typedef std::complex<acc_t> cpxacc_t;
-
 typedef ap_axiu<32, 0, 0, 0> axis_iq_t;    // 16b I in [31:16], 16b Q in [15:0]
 
-// scaling schedule (scaled mode): ~divide by 2 per radix-2 stage so the FFT
-// outputs stay inside +/-1. Magnitudes are scaled uniformly; the peak location
-// and the early/late distortion RATIO are scale-invariant (the verified outputs).
+// scaling schedule (scaled mode): ~divide by 2 per radix-2 stage so FFT outputs
+// stay inside +/-1. Magnitudes are scaled uniformly; the peak location and the
+// early/late distortion RATIO are scale-invariant (the outputs we use).
 #define SCALE_SCHED 0x2AB
 
+// Random-access new-API fft (internal datamovers) so the correlation arrays can be
+// indexed freely; this API supports scaled mode only.
 static void run_fft(bool forward, cpx_t in[FFT_SIZE], cpx_t out[FFT_SIZE]) {
 #pragma HLS INLINE off
     bool ovflo = false;
