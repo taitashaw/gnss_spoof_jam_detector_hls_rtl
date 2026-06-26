@@ -82,3 +82,6 @@ hls/vitis_hls/ddmap_ownfft_prj/
 ddmap_ownfft_prj/
 vectors/fft_test/
 hls/vitis_hls/ddmap_ownfft400_prj/
+build/vivado_bd_ownfft/
+hls/vitis_hls/ddmap_ownfft_ip_prj/
+ddmap_ownfft_ip_prj/

@@ -18,7 +18,10 @@ design validates with **zero critical warnings** and synthesizes with real
 post-synthesis utilization (below). No bitstream is generated and nothing is run
 on hardware.
 
-![GNSS system block design](images/gnss_block_design.png)
+> Note: the committed `docs/images/gnss_block_design.png` now shows the **current**
+> own-FFT ddMap/SQM block design (`vivado/run_bd_ownfft.tcl`), not this legacy
+> metric-engine integration. The legacy block design described here is no longer
+> rendered. See README and `docs/images/BLOCK_DESIGN.md` for the current BD.
 
 ## PS / PL architecture
 

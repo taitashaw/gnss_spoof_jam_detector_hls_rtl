@@ -26,11 +26,12 @@ measurements.
   271,504 cycles/cell (~3.4×). It still meets the real-time monitoring deadline (7.2×
   per-cell headroom; `docs/audit_latency_cdc.md`). A streaming SDF FFT would recover
   throughput but is not required by the deadline.
-- **Not yet integrated into a Vivado block design.** The own-FFT kernel is verified
-  by csim + csynth (488.76 MHz). It has not yet been packaged as IP into a BD, so
-  there is no current-kernel hardware image/waveform yet (none is faked). The PL-fabric
-  CDC/latency properties are audited on the existing single-clock integration
-  (`docs/audit_latency_cdc.md`).
+- **Not board-flashed.** The own-FFT kernel is exported as IP and integrated into a
+  Zynq UltraScale+ block design that validates with zero critical warnings
+  (`vivado/run_bd_ownfft.tcl`), with a rendered block-design diagram and a real cosim
+  AXIS waveform (`docs/images/`), and the PL-fabric CDC/latency are audited
+  (`docs/audit_latency_cdc.md`) — but there is no on-hardware run (no bitstream flashed
+  to a board).
 - **Cold full-sky acquisition is not real-time per 4 ms window.** A full 32-PRN ×
   ~13-Doppler search is ~416 cells = 231 ms — fine at an operational detection cadence
   (≥ ~250 ms), but it exceeds a single 4 ms coherent window. Continuous per-window

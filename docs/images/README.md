@@ -2,41 +2,36 @@
 
 Author: John Bagshaw — License: MIT (c) 2026 John Bagshaw
 
-All images here are produced from real runs, not mock-ups. They are split into
-**current detector** (DBZP ddMap + own-FFT + SQM) and **legacy** (the superseded
-streaming metric engine — see README section 11). No legacy image is referenced as
-the current design.
+Every image here is a real export from the **current** DBZP ddMap + own-FFT + SQM
+detector — block design, AXIS waveform, and detection charts. No mock-ups, and no
+legacy metric-engine images remain.
 
-## Current detector
+## Block design
+
+- `gnss_block_design.png` / `.svg` — the Vivado IP-Integrator block design built
+  around the **current own-FFT kernel** (`xilinx.com:hls:ddmap_sqm_hls:1.0`):
+  Zynq UltraScale+ PS → AXI DMA (MM2S) → kernel `iq_in`, with the kernel's
+  `s_axi_ctrl` (results: peak_power, code_phase, distortion, early/late power) and
+  the DMA control on the PS `M_AXI_HPM0` via SmartConnects. Built and validated
+  (zero critical warnings) by `vivado/run_bd_ownfft.tcl`, exported headless with
+  `write_bd_layout` (SVG/PDF) under Xvfb, the PDF rasterized to PNG. See
+  `docs/images/BLOCK_DESIGN.md`.
+
+## AXIS waveform
+
+- `waveform_ddmap_axis.png` — the current kernel's `iq_in` AXI4-Stream handshake from
+  a **real XSim C/RTL co-simulation** (`cosim_design` on `ddmap_sqm_hls`, which now
+  runs because the FFT is our own — no vendor C-model). Rendered by
+  `scripts/render_ddmap_wave.py` from the cosim VCD. It shows the kernel holding
+  `iq_in_TREADY` low while it computes the C/A generation and the code FFT, then
+  asserting `TREADY` to read one 2048-beat block (TVALID high, real TDATA streaming,
+  `TLAST` at the end) — genuine kernel-side backpressure. Every transition is a real
+  VCD transition. Regenerate: run `cosim_design -trace_level all` on the kernel, dump
+  the `iq_in_*` signals to a VCD over a ~90 us window, then run the render script.
+
+## Detection charts
 
 - `ddmap_peaks.png` — clean-vs-spoofed ddMap peak (strongest PRN) from a real-C/A
   DBZP acquisition on TEXBAT (`docs/single_pass_detection.md`).
-- `benchmark_dbzp_vs_pcs.png` — measured DBZP-vs-PCS benchmark (sensitivity, PRN
-  accuracy, ds7 spoof) from `scripts/benchmark.py`
-  (`docs/comparison_baseline_vs_ddmap.md`).
-
-### Pending current-kernel hardware renders
-
-The own-FFT ddMap kernel (`hls/src/ddmap_sqm_hls.cpp`) is verified by csim + csynth
-(`hls/vitis_hls/run_ddmap_ownfft.tcl`, 488.76 MHz) but has **not** yet been packaged
-into a Vivado IP-Integrator block design, so there is **no current-kernel
-block-design image or AXIS waveform yet** — and none is faked. When the own-FFT kernel
-is integrated into a BD, regenerate the block-design diagram and an AXIS-handshake
-waveform from that kernel (headless under Xvfb, the same flow the legacy BD used).
-The latency + CDC properties of the integrated PL fabric are already audited in
-`docs/audit_latency_cdc.md` (single-clock, all paths safely timed).
-
-## Legacy streaming front-end (superseded — documents the old metric engine only)
-
-These render the legacy NCO/PRN/metric-engine subsystem and are referenced only by
-the legacy docs (`docs/system_integration.md`, `docs/latency_report_template.md`):
-
-- `gnss_block_design.png` / `.svg` — the legacy metric-kernel Vivado block design.
-- `waveform_mixed_attack.png` + `mixed_attack.vcd` / `.wcfg` — a real XSim VCD render
-  of the legacy `tb_gnss_top` under burst backpressure (rendered by
-  `scripts/render_wave.py`; every transition is a real VCD transition).
-- `scores_by_scenario.png`, `metrics_by_scenario.png` — the legacy 8-scenario metric/
-  score charts (`make plots`).
-
-They are retained as evidence of the legacy subsystem's streaming/backpressure
-discipline; they do not describe the current ddMap/SQM detector.
+- `benchmark_dbzp_vs_pcs.png` — measured DBZP-vs-PCS benchmark from
+  `scripts/benchmark.py` (`docs/comparison_baseline_vs_ddmap.md`).

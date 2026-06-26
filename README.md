@@ -156,7 +156,26 @@ Head-to-head on the same inputs (`scripts/benchmark.py`,
 - **Decision:** HLS passes — no RTL overhaul. A streaming SDF FFT would add throughput
   headroom but is not required by the deadline.
 
-## 9. How to run
+## 9. System integration (block design + AXIS waveform)
+
+The current own-FFT kernel is exported as IP (`xilinx.com:hls:ddmap_sqm_hls:1.0`,
+`hls/vitis_hls/run_export_ownfft.tcl`) and integrated into a Zynq UltraScale+ block
+design (`vivado/run_bd_ownfft.tcl`) that **validates with zero critical warnings**:
+PS → AXI DMA (MM2S) → kernel `iq_in`, results read back over the kernel's
+`s_axi_ctrl` registers (the kernel has no AXIS output — results are register reads,
+not an S2MM stream).
+
+![Current own-FFT ddMap/SQM block design](docs/images/gnss_block_design.png)
+
+C/RTL co-simulation (`cosim_design`) **passes** — possible now that the FFT is our
+own (the vendor FFT C-model blocked it before). The real cosim VCD shows the kernel's
+`iq_in` AXI4-Stream handshake: `TREADY` held low while the kernel computes the C/A
+generation and code FFT, then asserted to read one 2048-beat block (TVALID high, real
+TDATA streaming, `TLAST` at the end) — genuine kernel-side backpressure.
+
+![Current kernel iq_in AXIS handshake (real XSim cosim)](docs/images/waveform_ddmap_axis.png)
+
+## 10. How to run
 
 ```
 python3 scripts/gen_fft_twiddle.py                 # twiddle ROM (compile-time)
@@ -170,14 +189,14 @@ vitis-run --mode hls --tcl hls/vitis_hls/run_ddmap_ownfft.tcl   # detector csim 
 `scripts/dbzp_acq.py` / `scripts/pcs_acq.py` / `scripts/benchmark.py` reproduce the
 acquisition, baseline, and benchmark on real TEXBAT data.
 
-## 10. Verification hierarchy
+## 11. Verification hierarchy
 
 numpy FFT accuracy gate → detector C-sim vs the Python golden → (XSim cycle sim of the
 RTL front-end) → TEXBAT real-data validation → latency + CDC audit. Details in
 `docs/verification_strategy.md`. The single golden source for the detection math is
 `scripts/dbzp_acq.py` / `scripts/gps_ca.py`.
 
-## 11. Legacy streaming front-end (superseded — not the detector)
+## 12. Legacy streaming front-end (superseded — not the detector)
 
 An earlier version of this repo implemented a **streaming anomaly metric engine**: an
 RTL NCO mixer → PRN LFSR / early-prompt-late tap → fixed-point HLS metric engine →
@@ -196,7 +215,7 @@ core. Its files are retained for reference and clearly labeled as legacy:
 No part of the current detector depends on the legacy front-end; the detection itself
 is the ddMap/SQM core.
 
-## 12. Provenance and integrity
+## 13. Provenance and integrity
 
 Detection algorithms are a clean-room MIT re-implementation of the author's published
 MATLAB receiver (`norm_acq_parcode` baseline, `weak_acq_optimized_DBZP` candidate;
