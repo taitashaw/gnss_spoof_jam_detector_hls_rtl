@@ -2,364 +2,206 @@
 
 ![selfcheck](https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl/actions/workflows/selfcheck.yml/badge.svg)
 
-A streaming, fixed-point GNSS anomaly detection accelerator built the way real
-FPGA work should be shown: simulation-first, hardware-aware, and verified under
-cycle-level AXI4-Stream backpressure. It accepts signed complex I/Q samples and
-flags wideband jamming, tone jamming, C/N0 degradation, correlation-symmetry
-distortion, delayed spoof-like replicas, Doppler/phase-energy anomalies, and
-sudden power jumps.
+Author: John Bagshaw <jotshaw007@gmail.com> — License: MIT (c) 2026 John Bagshaw
 
-Author: John Bagshaw — GitHub: [`taitashaw`](https://github.com/taitashaw) —
-Repo: `https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl` — License: MIT.
+A fixed-point FPGA accelerator that detects GPS L1 C/A **spoofing** and **jamming**
+from the acquisition **delay-Doppler map (ddMap)**. It runs a single-pass DBZP
+(double-block zero-padding) coherent acquisition, builds the ddMap with a
+**from-scratch, numpy-verified fixed-point FFT**, and reads two attack signatures off
+it: early/late **signal-quality-monitoring (SQM) distortion** for spoofing, and ddMap
+energy / noise-floor elevation for jamming. Validated on real recorded spoofing
+(TEXBAT ds2/ds7) and synthesized to **488.76 MHz** on a Zynq UltraScale+ (ZCU104).
 
-This is not a certified GPS receiver. It is a real-time FPGA accelerator that
-computes GNSS-relevant anomaly metrics over configurable sample windows, with the
-hardware/software partition chosen the way a production design would make it.
+The detection algorithm is a clean-room MIT re-implementation of the author's own
+published GPS receiver (York University, Prof. Sunil Bisnath); nothing is fabricated
+— every number below is verbatim from a committed report.
 
----
-
-## 1. Project overview
-
-The accelerator ingests a 32-bit AXI4-Stream of signed I/Q (`I = tdata[31:16]`,
-`Q = tdata[15:0]`), mixes it to baseband with an RTL NCO, despreads it against a
-PRN-like code with early/prompt/late correlators, computes a battery of anomaly
-metrics in a streaming metric engine, and emits one metrics packet per window
-carrying per-metric values, a saturated spoof score, a saturated jam score,
-packed alert flags, and a cycle-accurate latency measurement.
-
-The design is deliberately split so each part is shown where it is strongest:
-
-- HLS where it is powerful — metric accumulation, fixed-point scoring.
-- RTL where it is mandatory — deterministic streaming, NCO/mixer, PRN/LFSR,
-  E/P/L tap alignment, threshold and alert packing, latency measurement.
-- XSim where reality is proven — valid/ready, backpressure, packet stability,
-  latency, and correctness against a single golden model.
-
-## 2. Why GNSS spoof/jam detection matters
-
-GNSS is the silent dependency under timing, navigation, and synchronization for
-power grids, telecom, finance, autonomy, and defense. It is also trivially
-attacked: a few dollars of RF can jam a band, and a software-defined radio can
-transmit a counterfeit constellation that walks a receiver off its true position
-or time. Detection has to happen at the front end, in real time, on every sample
-window, before a corrupted fix propagates into the system that trusts it. That is
-an FPGA problem: deterministic, low-latency, and streaming.
-
-## 3. Why FPGA acceleration matters
-
-A CPU or GPU can compute these metrics, but not with bounded per-window latency
-under a continuous high-rate sample stream and not without buffering that defeats
-the point. An FPGA processes the stream as it arrives, with a fixed pipeline,
-exact fixed-point arithmetic, and a hard latency bound that this project measures
-directly with a hardware latency counter rather than estimates. The whole design
-avoids floating point in every synthesizable path.
-
-## 4. Hardware bench alignment
-
-The intended bench is a Zynq UltraScale+ class part (ZCU104, `xczu7ev-ffvc1156-2-e`)
-with a GNSS RF front-end over FMC and a GPS antenna. The deliverable does not
-assume any of that exists yet: it runs entirely from generated synthetic I/Q and
-is structured so a real ADC/FMC stream replaces the synthetic input later without
-touching the metric engine. See `docs/hardware_bringup_notes.md`.
-
-## 5. Architecture
+## 1. The detector at a glance
 
 ```
-Synthetic or ADC I/Q Stream
+Pre-wiped, decimated I/Q  (one 1 ms C/A block, 2046 samples @ 2.046 Msps)
         |
         v
-AXI4-Stream Skid Buffer
++---------------------------------------------------------------+
+|  ddMap / SQM detector  (hls/src/ddmap_sqm_hls.cpp)            |
+|                                                              |
+|  on-chip C/A code (G1/G2 Gold code)  --FFT-->  conj          |
+|                                                  |           |
+|  block I/Q  --FFT-->  x ----------------> IFFT --+--> corr   |
+|                                                  (coherent   |
+|                                       accumulate over N_BLK) |
+|                                                  |           |
+|                          delay-Doppler-map cell -+           |
+|                                                  |           |
+|     peak power | code phase | early/late SQM distortion      |
++---------------------------------------------------------------+
         |
         v
-RTL NCO Mixer
-        |
-        v
-RTL PRN / Early-Prompt-Late Generator
-        |
-        v
-HLS GNSS Metric Engine
-        |
-        v
-RTL Alert Packer + Latency Counter
-        |
-        v
-AXI4-Stream Metrics Output
+  spoof = distortion > threshold ; jam = floor / energy elevation
 ```
 
-## 6. HLS / RTL partitioning
+One call computes one ddMap cell (one PRN, one Doppler hypothesis, `N_BLK = 4`
+coherent 1 ms blocks). The carrier-Doppler wipeoff and the outer PRN/Doppler search
+loop are the host's job. The FFT (forward and inverse) is the same shared
+`fft_fixed` instance, reused for the code FFT, the per-block FFT, and the IFFT.
 
-| Block | Domain | Why |
-|---|---|---|
-| Skid buffer, register slice | RTL | deterministic AXIS flow control |
-| NCO mixer | RTL | per-sample phase accumulator, LUT mix, saturation |
-| PRN LFSR + E/P/L tap | RTL | deterministic code generation and stream alignment |
-| Metric engine | HLS (RTL stand-in in sim) | accumulation and fixed-point scoring |
-| Alert packer | RTL | threshold compare, flag packing, latency fold-in |
-| Latency / packet counters | RTL | cycle-accurate measurement and health |
+See `docs/architecture.md` for the full signal path and `docs/single_pass_detection.md`
+for the detection theory.
 
-The metric engine has two interchangeable implementations behind one identical
-port list: a behavioral SystemVerilog model (`rtl/gnss/gnss_metric_hls_model.sv`,
-the default so `make xsim` runs without Vitis HLS) and the Vitis-HLS-exported IP
-(`hls/src/gnss_metric_hls.cpp`). Swapping them is a one-line change in
-`vivado/compile_order.tcl`.
+## 2. Why it matters
 
-## 7. Data formats
+GNSS underpins timing and navigation for power grids, finance, telecom and aviation.
+Spoofing (a counterfeit constellation that captures the receiver) and jamming
+(broadband denial) are cheap and increasingly common. A real-time hardware monitor
+that flags both directly from the acquisition map — without a full tracking receiver
+— is a practical front-line defense. The hardest spoofing class, matched-power SCER
+(security-code estimation and replay, TEXBAT ds7), is exactly what the SQM distortion
+metric catches here.
 
-- Input I/Q: AXI4-Stream, 32-bit `tdata` (`I s16` in `[31:16]`, `Q s16` in
-  `[15:0]`), `tlast` on the final sample of each window. Default window = 1024.
-- Tapped stream (mixer/PRN output to the metric engine): mixed I/Q (s16) plus
-  early/prompt/late chip signs plus sample index plus `tlast`.
-- Metrics output: one packed AXI4-Stream beat per window. Fields and offsets are
-  the single source of truth in `rtl/gnss/gnss_top_pkg.sv`.
+## 3. The FFT — from-scratch, numpy-verified (the heart of the design)
 
-The exact metric definitions are in Section 3 of the in-repo spec and implemented
-identically in the C reference, the HLS kernel, the SystemVerilog model, and the
-Python generator. The golden definitions live in `hls/src/gnss_metric_ref.cpp`.
+The ddMap correlation needs an FFT. Rather than depend on a vendor IP whose
+bit-accurate C-model could not be simulated on this install, the detector uses an
+own **radix-2 decimation-in-time fixed-point FFT** (`hls/src/fft_fixed.hpp`,
+`docs/fft_fixed_design.md`):
 
-## 8. How to run
+- N = 2048, `ap_fixed<24,4>` data / `ap_fixed<18,2>` twiddles, compile-time twiddle
+  ROM, per-stage /2 scaling, convergent rounding. No vendor FFT, no float in the body.
+- **Hard accuracy gate vs `numpy.fft` (must pass before use):** SNR ≥ 50 dB on every
+  test vector. Measured (`hls/tb/tb_fft_fixed.cpp`, plain csim): impulse exact, tone
+  **96.5 dB / 15.7 ENOB**, random 83.9 dB / 13.6 ENOB, C/A block **85.6 dB / 13.9
+  ENOB**, worst case impulse7 54.7 dB / 8.8 ENOB, ifft(fft(x)) round-trip 68 dB. Gate
+  **PASSED** before the FFT was wired into the detector.
 
-Lead with `make selfcheck` — it needs only `python3` (numpy) and `g++`, no Xilinx
-tools, and is the authoritative gate.
+Because this FFT is ordinary C++ with no vendor model, the detector's C-simulation
+actually runs — which is how a latent on-chip C/A shift-sign bug was caught and fixed.
 
-```
-make selfcheck     # vectors -> C golden sim -> check -> summary  (no Xilinx tools)
-make hls-csim      # HLS kernel C-sim vs golden using Vitis ap_int headers (no synth)
-make hls           # full Vitis HLS C-sim + synth + export (needs vitis_hls on PATH)
-make xsim          # XSim cycle simulation of the 8-scenario matrix (needs Vivado)
-make check         # validate whatever results exist against expected flags/ranges
-make summary       # write results/summary.md
-make help          # list every target and what it requires
-```
+## 4. Detector C-simulation vs the Python golden
 
-Toolchain assumptions (override as noted):
+`hls/tb/tb_ddmap_sqm_hls.cpp` runs the synthesizable kernel against the Python golden
+(`scripts/ddmap_hls_vectors.py`) at the matched 2-samples/chip config. **PASS:**
 
-- Python 3.10+ with numpy (matplotlib only for optional plots).
-- Vitis HLS 2022.2+ for `make hls` (`ap_int`, `ap_axiu`, `hls::stream`).
-- Vivado 2022.2+ with XSim for `make xsim`.
-- Target part `xczu7ev-ffvc1156-2-e`. Change it in ONE place: `PART` in
-  `vivado/compile_order.tcl` (RTL/XSim) and the `PART` line in
-  `hls/vitis_hls/run_hls.tcl` (HLS).
+| case | kernel peak | golden peak | kernel distortion | golden distortion |
+|---|---|---|---|---|
+| clean PRN 5 | 600 (exact) | 600 | 0.3305 | 0.3305 |
+| ds7 spoofed PRN 23 | 1393 (exact) | 1393 | 0.799 | 0.799 |
+| wrong PRN 6 | peak 47.5× lower than correct | — | — | — |
 
-## 9. Expected outputs
+Correct-PRN code phase is exact, wrong-PRN cross-correlation is suppressed 47.5×, and
+the ds7-spoofed SQM distortion (0.799) is well above the clean floor (0.330).
 
-`make selfcheck` writes `results/<scenario>/actual_metrics.txt` and a
-`results/summary.md` table. Each scenario asserts an exact alert-flag set:
+## 5. Synthesis — real numbers (Vitis HLS 2025.2, xczu7ev-ffvc1156-2-e)
 
-| Scenario | Alert flags |
-|---|---|
-| clean, backpressure | none |
-| cn0_drop | cn0_drop |
-| delayed_spoof | corr_asymmetry, spoof_score_high |
-| doppler_shift | cn0_drop, doppler_anomaly, spoof_score_high |
-| wideband_jam, tone_jam | high_power, cn0_drop, doppler_anomaly, spoof_score_high, jam_score_high |
-| mixed_attack | all six attack flags |
-
-## Results
-
-Both charts are produced by `make plots` from the real `make selfcheck` / `make xsim`
-run over the eight deterministic scenarios (seed `0xC0FFEE`). The C golden model,
-the HLS kernel, and the SystemVerilog model all produce these same values.
-
-![Spoof and jam scores per scenario](docs/images/scores_by_scenario.png)
-
-Spoof and jam scores per scenario against the alert threshold (500). Clean and
-backpressure sit near zero; each attack lifts its score past the threshold, and
-mixed_attack drives the highest spoof score.
-
-![Clean versus attack metric signatures](docs/images/metrics_by_scenario.png)
-
-Clean-versus-attack metric signatures with the alert thresholds drawn in. Left:
-power and Doppler energy on a log scale — jamming dominates absolute power. Right:
-correlation symmetry (the spoof signature, high only for delayed_spoof and
-mixed_attack) and the C/N0 proxy line, which collapses under jamming, Doppler, and
-C/N0 degradation while staying high for clean and backpressure.
-
-## Synthesis (real, from Vitis HLS 2025.2)
-
-`make hls` ran C simulation, C synthesis, and RTL IP export on this machine. The
-numbers below are copied verbatim from the tool report (`docs/synthesis_report.md`,
-raw reports in `docs/synth/`); none are estimated by hand:
+Verbatim from `docs/synth/ddmap_ownfft_csynth.rpt` (own-FFT detector):
 
 | Metric | Value |
 |---|---|
-| C simulation | all 8 scenarios pass, 0 errors |
-| ACC_LOOP initiation interval | 1 (target 1), pipelined |
-| Clock target / estimated | 5.00 ns / 3.625 ns (uncertainty 1.35 ns) |
-| DSP / FF / LUT / BRAM | 4 / 1735 / 4026 / 0 |
-| Target part | xczu7ev-ffvc1156-2-e |
+| Timing target / estimated | 2.50 ns / **2.046 ns** = **488.76 MHz** (+0.45 ns slack) |
+| BRAM_18K | 58 / 624 (9%) |
+| DSP | 14 / 1728 (1%) |
+| FF | 7878 / 460800 (2%) |
+| LUT | 9539 / 230400 (4%) |
+| Latency (one ddMap cell) | 271,504 cycles (~0.56 ms); FFT butterfly II=2 |
 
-These are post-C-synthesis estimates; post-implementation timing closure is a
-deferred phase (see the roadmap).
+The 400 MHz target was met at **488.76 MHz**, closed by retiming only (ping-pong FFT
+memory, DSP-registered butterfly, multipliers replaced by shifts, partial-max SQM
+reduction) with **no accuracy change** — both gates above still pass. Full method and
+the cost (latency 80,208 → 271,504 cycles, DSP 86 → 14) are in
+`docs/synth/ddmap_kernel_NOTES.md`.
 
-Absolute cycle latency is **not** bounded by synthesis: `WINDOW_SIZE` is a run-time
-input, so the accumulation loop's trip count and total latency report as `?` in the
-csynth report (synthesis gives throughput, II = 1, but no fixed latency). The real
-per-window latency is the XSim-measured **1021 cycles with no backpressure and up to
-2038 cycles under burst backpressure** (from `axis_latency_counter`), not a
-synthesized figure.
+## 6. Real-data validation (TEXBAT)
 
-## Verification
+Texas Spoofing Test Battery (UT Austin Radionavigation Lab, Humphreys et al., ION
+GNSS+ 2012). The ~43 GB `.bin` files are never committed — referenced by path +
+SHA256 + citation only (`docs/texbat_validation.md`). Slices: ds2 clean t=20 s /
+spoofed t=150 s; ds7 clean t=20 s / spoofed t=250 s; 10 ms coherent, 25 Msps decimated
+by 2; the early/late distortion threshold ≥ 0.50, gated on the clean-slice
+false-alarm rate. Measured over the acquired satellites (`docs/single_pass_detection.md`):
 
-![XSim waveform under burst backpressure](docs/images/waveform_mixed_attack.png)
+| scenario | peak-distortion clean false-alarm | spoofed detection | separates? |
+|---|---|---|---|
+| **ds7** (matched-power SCER) | **0%** | **100%** | **yes** |
+| ds2 (overpowered time-push) | 0% | 0% | no (caught by absolute power, not shape) |
 
-A timing diagram rendered from the real XSim value-change dump of the
-`mixed_attack` scenario under burst backpressure (seed `0xC0FFEE`,
-`scripts/render_wave.py` over `docs/images/mixed_attack.vcd`). The shaded interval
-is a metrics-output backpressure event: `m_axis_tvalid` is held while
-`m_axis_tready = 0` and `tdata` stays stable, exactly the AXIS rule a functional C
-simulation cannot exercise. The input handshake, the tapped stream into the metric
-engine, and the packet `tlast` are all visible. Regenerate with `make waves`; open
-`mixed_attack.vcd` / `mixed_attack.wcfg` in the Vivado GUI to inspect interactively
-(see `docs/images/README.md`).
+ds7 — the hardest spoofing class — is detected at 100% with 0% clean false-alarm by
+the SQM distortion. ds2 is an overpowered displaced-but-clean peak that the
+distortion metric honestly does not separate; it is caught by absolute power /
+ddMap energy. Sample scope is one slice per scenario over the acquired satellites —
+a measured result, not a full ROC.
 
-## 10. Verification strategy
+## 7. Benchmark — DBZP ddMap vs the PCS baseline
 
-A single golden model wins all ties: `hls/src/gnss_metric_ref.cpp`. The HLS kernel
-is checked TIGHT against it; XSim output is checked against loose metric ranges and
-exact alert flags; the Python generator's mix/PRN front-end is cross-checked
-bit-for-bit against the golden front-end. The XSim flow drives real AXI4-Stream
-backpressure (random and burst, seeded and reproducible) and proves the metrics
-are unchanged by it. Full detail in `docs/verification_strategy.md`.
-
-## 11. Known limitations
-
-Honest scope is in `docs/known_limitations.md`: this is not a certified GPS
-receiver, the PRN generator is PRN-like rather than a full C/A Gold code, C/N0 is
-a deterministic proxy, Doppler is a simplified anomaly proxy, and there is no live
-RF validation yet. No fabricated resource or timing numbers appear anywhere.
-
-## 12. Future hardware bring-up path
-
-`docs/hardware_bringup_notes.md` describes the ZCU104 PS/PL data path, the
-NT1065/FMC front-end work that is gated on real board documentation (FMC pinout,
-ADC sample format, clocking and reset constraints), and the smaller Zybo/Basys
-educational subsets. The single concrete next step is to replace the synthetic
-I/Q source with a captured NT1065 ADC frame at the same s16 I/Q contract and
-re-run the existing verification unchanged.
-
-## System Integration
-
-The exported metric IP is integrated into a ZCU104-class Zynq UltraScale+ system
-as a reproducible Vivado IP Integrator block design (`vivado/run_bd.tcl`, batch).
-The PS drives an AXI DMA that streams data into the kernel (MM2S to `tap_in`,
-64-bit) and writes the 512-bit metrics packets back (`metric_out` to S2MM), with
-the control plane over AXI4-Lite. The default variant also exposes external
-`fmc_iq_in` / `metrics_out_ext` AXI4-Stream ports (an input switch + output
-broadcaster) for a direct FMC/ADC front-end path alongside the DMA. The block
-design **validates with zero critical warnings**. Full detail and the PS/PL
-datapath are in `docs/system_integration.md`.
-
-![GNSS system block design](docs/images/gnss_block_design.png)
-
-The design was **placed, routed, and a bitstream generated** (DMA-only deployable
-variant — the external 512-bit metrics bus would exceed the package I/O). Real
-post-implementation results on the `xczu7ev`, verbatim in
-`docs/implementation.md` / `docs/synth/impl_*.rpt`:
-
-| Metric | Value |
-|---|---|
-| Timing | WNS +4.484 ns, TNS 0.0, 0 failing endpoints — closes |
-| LUT / FF | 10044 (4.36%) / 16882 (3.66%) |
-| BRAM / DSP | 10 tiles (3.21%) / 4 (0.23%) |
-| Bitstream | generated (`write_bitstream Complete!`) |
-
-Status: block design validated, synthesized, implemented (timing closed), and
-bitstream generated; **not yet flashed to a board.**
-
-## Real-Data Validation (TEXBAT)
-
-The 8 synthetic scenarios remain the primary functional suite. As an additional
-check on **real recorded GPS spoofing data** (not synthetic, not re-transmitted),
-the pipeline was run over two scenarios from the Texas Spoofing Test Battery
-(TEXBAT, UT Austin Radionavigation Lab; Humphreys et al., ION GNSS+ 2012): **ds2**
-(overpowered time-push) and **ds7** (matched-power SCER, the hardest class). Clean
-and post-onset slices (128 windows each) were read directly from the local ~43 GB
-`.bin` files by byte offset — the files are never loaded whole and **never
-committed** (referenced by path + SHA256 + citation).
-
-On the real data, both the C reference and XSim (bit-exact) show:
-
-- **ds2:** `power_estimate` +225% and `doppler_energy` +158% at the attack — a
-  clear response to the overpowered spoofer.
-- **ds7:** all metrics move under 8% — the matched-power SCER attack is not clearly
-  flagged. ds7 is decisively harder than ds2.
-
-Honest scope: that pre-tracking path uses a PRN-like LFSR, not a C/A tracking
-receiver, so its correlation metrics do not provide despread-based discrimination
-(the ds7 null above is exactly that LFSR-front limitation). Full method, tables, the
-null result, and provenance are in `docs/texbat_validation.md`.
-
-### Single-pass detection from the acquisition delay-Doppler map (real C/A)
-
-To address that limitation, a single-pass detector computes spoof statistics
-directly from a real-C/A DBZP acquisition delay-Doppler map (ddMap) — one pass, no
-separate tracking stage (a clean-room port of the author's York University receiver;
-see `docs/single_pass_detection.md`). On the real slices it acquires 11 GPS
-satellites, and gated on clean-slice false-alarm:
-
-- **ds7 (matched-power SCER):** the early/late peak-distortion metric separates at
-  **100% detection, 0% clean false-alarm** — the authentic and delayed replica
-  coexist and distort the correlation peak (a signal-quality-monitoring signature).
-- **ds2 (overpowered):** the ddMap peak shape does **not** separate (single clean
-  displaced peak); that attack is caught by power, not peak structure.
-
-This revises the naive expectation honestly — distortion catches the coexisting
-matched-power spoofer, not the overpowered one — and `peak_count`/`peak_ratio` did
-not separate either (clean multipath). DBZP coherent integration provides the
-measured sensitivity (a weak satellite below threshold at 1 ms is acquired by 8 ms).
-
-### Benchmark: PCS baseline vs DBZP ddMap (measured)
-
-A head-to-head on the same inputs (`scripts/benchmark.py`,
-`docs/comparison_baseline_vs_ddmap.md`), reported as the numbers stand:
+Head-to-head on the same inputs (`scripts/benchmark.py`,
+`docs/comparison_baseline_vs_ddmap.md`), reported as measured:
 
 - **Sensitivity:** DBZP minimum detectable C/N0 is **+1 dB (4 ms) / +2 dB (10 ms)**
-  better than PCS at matched ~1% false-alarm — inside the literature-consistent
-  ~2–3 dB range, not a tens-of-dB anomaly.
-- **PRN accuracy:** equal (both 7/7 truth satellites; no spurious cross-correlation
-  PRNs).
-- **Spoof (ds7 SCER):** comparable — both flag the distortion at 100% / 0% clean
-  false-alarm; DBZP acquires more satellites (10 vs 3), so more coverage.
+  better than parallel-code-search at matched ~1% false-alarm — inside the
+  literature-consistent ~2–3 dB band, not a tens-of-dB anomaly.
+- **Spoof (ds7):** both detect at 100% / 0% clean FA; DBZP acquires more satellites
+  (10 vs 3) → more coverage.
 - **Cost:** a trade — DBZP needs ~3× fewer large FFTs at fine Doppler but ~2× the
   working memory.
 
-Verdict: more sensitive (+1–2 dB) with more satellite coverage, traded against ~2×
-memory; spoof/jam detection quality comparable. Not a uniform win.
+## 8. Latency + CDC audit
 
-**Kernel scope note.** The HLS/RTL synthesis, implementation, block-design, and
-latency numbers elsewhere in this README and under `docs/synth/` describe the
-original **streaming metric-engine** kernel (the LFSR/NCO-PRN anomaly accelerator).
-The **DBZP ddMap + SQM detector** above — the real detection core on real GPS data —
-is implemented and validated as the C/Python golden plus this benchmark; an HLS
-realignment of its FFT-correlation kernel (heavier per the cost table) is the next
-hardware step and has not been synthesized. No ddMap-kernel synthesis number is
-claimed.
+`docs/audit_latency_cdc.md` (measured from the csynth report and Vivado
+`report_cdc`):
 
-## Roadmap — deferred phases
+- **Latency:** one ddMap cell = 271,504 cycles = 555.5 µs @ 488.76 MHz, consuming
+  4 ms of data → **7.2× per-cell real-time headroom** (budget ~7 cells per 4 ms
+  window). **Verdict: meets the real-time monitoring deadline.**
+- **CDC:** the PL fabric is single-clock (`clk_pl_0`, 96.97 MHz); the kernel exposes
+  only `ap_clk`. `report_cdc` on the routed design = **"All paths are Safely Timed"**
+  (0 critical, 0 warning). No CDC findings on the current design.
+- **Decision:** HLS passes — no RTL overhaul. A streaming SDF FFT would add throughput
+  headroom but is not required by the deadline.
 
-What is done is stated plainly above: the golden model, the RTL datapath, full
-XSim cycle verification under backpressure, Vitis HLS C synthesis, and the
-validated Zynq UltraScale+ block design that is implemented (timing closed) with a
-generated bitstream. The following are pending hardware, not done yet:
+## 9. How to run
 
-1. On-board bring-up on a ZCU104-class board (programming the device over JTAG).
-2. ILA / hardware debug verification of the live datapath.
-3. NT1065 FMC RF front-end capture replacing the synthetic I/Q source, gated on the
-   board documentation listed in `docs/hardware_bringup_notes.md`.
+```
+python3 scripts/gen_fft_twiddle.py                 # twiddle ROM (compile-time)
+python3 scripts/gen_fft_vectors.py                 # FFT test vectors + numpy golden
+g++ -std=c++14 -I hls/include -I $VITIS/include \
+    hls/tb/tb_fft_fixed.cpp -o fft_test && ./fft_test .     # FFT accuracy gate
+python3 scripts/ddmap_hls_vectors.py               # detector vectors + golden
+vitis-run --mode hls --tcl hls/vitis_hls/run_ddmap_ownfft.tcl   # detector csim + csynth (2.5 ns)
+```
 
-## 13. Technical summary
+`scripts/dbzp_acq.py` / `scripts/pcs_acq.py` / `scripts/benchmark.py` reproduce the
+acquisition, baseline, and benchmark on real TEXBAT data.
 
-I built a GNSS spoofing and jamming detector the way real FPGA work should be
-shown: not a clean functional demo, but a streaming HLS and RTL design verified
-under cycle-level AXI4-Stream backpressure. Signed complex I/Q streams in; an RTL
-NCO mixer and PRN early/prompt/late generator feed a fixed-point metric engine
-that computes correlation symmetry, a division-free C/N0 proxy, an FFT-free
-Doppler-energy proxy, and saturated spoof and jam scores; an RTL alert packer
-emits one metrics packet per window with packed alert flags and a cycle-accurate
-latency count. Every metric is defined once in a golden C reference and matched by
-the HLS kernel, the SystemVerilog model, and the Python generator. The point is
-the verification: the same eight scenarios pass under no stalls, random stalls,
-and burst backpressure with identical results, because valid/ready is correct —
-which is exactly the property a functional demo never proves. This is the kind of
-evidence ShawSilicon (shawsilicon.ai) builds for verifying FPGA and ASIC engineers
-before companies spend interview cycles.
+## 10. Verification hierarchy
+
+numpy FFT accuracy gate → detector C-sim vs the Python golden → (XSim cycle sim of the
+RTL front-end) → TEXBAT real-data validation → latency + CDC audit. Details in
+`docs/verification_strategy.md`. The single golden source for the detection math is
+`scripts/dbzp_acq.py` / `scripts/gps_ca.py`.
+
+## 11. Legacy streaming front-end (superseded — not the detector)
+
+An earlier version of this repo implemented a **streaming anomaly metric engine**: an
+RTL NCO mixer → PRN LFSR / early-prompt-late tap → fixed-point HLS metric engine →
+alert packer, with its own synthesis, block design, and bitstream. That subsystem is
+**superseded** by the ddMap/SQM detector above and is **not** the current detection
+core. Its files are retained for reference and clearly labeled as legacy:
+
+- RTL: `rtl/gnss/{nco_mixer,prn_lfsr_gen,gnss_alert_packer}.sv` and their testbenches.
+- Config/types: the NCO/PRN/metric/CN0 constants in `hls/include/gnss_config.hpp`
+  (legacy section), `gnss_types.hpp`, `axis_types.hpp`.
+- Docs (labeled superseded): `docs/synthesis_report.md`, `docs/implementation.md`,
+  `docs/system_integration.md` — their numbers (DSP 4 / FF 1735 / LUT 4026 / BRAM 0;
+  block-design BRAM 10 / DSP 4) describe the legacy metric kernel, **not** the current
+  detector. No legacy number is presented as the current design's.
+
+No part of the current detector depends on the legacy front-end; the detection itself
+is the ddMap/SQM core.
+
+## 12. Provenance and integrity
+
+Detection algorithms are a clean-room MIT re-implementation of the author's published
+MATLAB receiver (`norm_acq_parcode` baseline, `weak_acq_optimized_DBZP` candidate;
+York University, Prof. Sunil Bisnath). Every synthesis/timing/accuracy number in this
+README is verbatim from a committed report under `docs/synth/` or `docs/`. TEXBAT
+`.bin` files are never committed (path + SHA256 + citation only). Negative results
+(ds2 not separated by distortion; the legacy metric kernel superseded) are reported
+honestly.

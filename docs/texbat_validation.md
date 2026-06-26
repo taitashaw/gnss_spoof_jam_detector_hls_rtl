@@ -2,13 +2,19 @@
 
 Author: John Bagshaw — License: MIT (c) 2026 John Bagshaw
 
-This runs the accelerator's metric pipeline over **real recorded GPS spoofing
-data** from the Texas Spoofing Test Battery (TEXBAT), not synthetic and not
-re-transmitted. It reports what the data actually shows, including a null result.
+> **Read this first — current vs legacy.** The **current detector's** TEXBAT result
+> is in `docs/single_pass_detection.md`: the real-C/A DBZP ddMap + SQM detector
+> **acquires the real GPS C/A codes** and detects ds7 (matched-power SCER) at **100%
+> with 0% clean false-alarm**. The section below is the **legacy** result: the
+> superseded PRN-like-LFSR metric pipeline returned a **null** on ds7 *because* it did
+> not correlate against the real C/A code — which is exactly the limitation the
+> current real-C/A acquisition fixed. This page is retained for the legacy null and
+> for the **file provenance** (format, SHA256, citation) that the current docs
+> reference. The TEXBAT `.bin` files are never committed.
 
-## Scope statement (read first)
+## Scope statement (legacy pipeline)
 
-This is a streaming **pre-tracking anomaly accelerator** whose despreading code is
+The legacy streaming **pre-tracking anomaly accelerator** whose despreading code is
 a **PRN-like LFSR**, not a full GPS C/A tracking receiver. It does **not** acquire
 or track the real GPS C/A Gold codes in the TEXBAT recordings. The claim here is
 narrow and honest: do the anomaly metrics **respond** at the documented attack

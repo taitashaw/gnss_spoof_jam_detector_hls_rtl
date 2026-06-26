@@ -24,8 +24,37 @@
 #ifndef GNSS_CONFIG_HPP
 #define GNSS_CONFIG_HPP
 
+// ===========================================================================
+// CURRENT DETECTOR  --  DBZP ddMap + own fixed-point FFT + early/late SQM
+//   These are the parameters of the live detection core
+//   (hls/src/ddmap_sqm_hls.cpp + hls/src/fft_fixed.hpp). The detector defines
+//   them inline in those files; they are restated here for reference. See
+//   docs/architecture.md, docs/fixed_point_design.md, docs/fft_fixed_design.md.
+// ===========================================================================
+static const int DDMAP_FFT_N        = 2048; // FFT length (radix-2 DIT, 11 stages)
+static const int DDMAP_FFT_LOG2N    = 11;   // log2(FFT_N)
+static const int DDMAP_CA_LEN       = 1023; // GPS L1 C/A code length (chips)
+static const int DDMAP_SAMP_PER_CHIP= 2;    // samples per chip -> NS = 2046
+static const int DDMAP_NS           = 2046; // used samples per 1 ms block
+static const int DDMAP_N_BLK        = 4;    // coherent 1 ms blocks per ddMap cell
+static const int DDMAP_PROD_SHIFT   = 14;   // spectral-product rescale = 2^14 (shift)
+static const int DDMAP_SQM_MAX_LANES= 4;    // partial-max peak-search lanes
+// Spoof decision: early/late distortion |E-L|/(E+L) >= threshold (Q16 output).
+// TEXBAT-validated threshold = 0.50 (50% in Q16 = 32768); 0% clean false-alarm,
+// 100% ds7 detection (docs/single_pass_detection.md). The host/eval applies it.
+static const int DDMAP_DISTORTION_THR_Q16 = 32768; // 0.50 in Q16
+
+// ===========================================================================
+// LEGACY STREAMING FRONT-END  (superseded -- NOT the current detector)
+//   The constants below configure the older streaming anomaly metric engine
+//   (NCO mixer -> PRN LFSR / E-P-L tap -> metric engine -> alert packer). They
+//   are retained only for that legacy subsystem (rtl/gnss/*, the C reference,
+//   the SV model) and are not used by the ddMap/SQM detector above. See README
+//   section 11.
+// ===========================================================================
+
 // ---------------------------------------------------------------------------
-// Windowing
+// Windowing  (legacy)
 // ---------------------------------------------------------------------------
 static const int WINDOW_SIZE      = 1024; // complex samples per metrics packet
 static const int WINDOW_LOG2      = 10;   // log2(WINDOW_SIZE)

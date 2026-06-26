@@ -2,63 +2,41 @@
 
 Author: John Bagshaw — License: MIT (c) 2026 John Bagshaw
 
-All images here are produced from real runs, not mock-ups.
+All images here are produced from real runs, not mock-ups. They are split into
+**current detector** (DBZP ddMap + own-FFT + SQM) and **legacy** (the superseded
+streaming metric engine — see README section 11). No legacy image is referenced as
+the current design.
 
-## Charts
+## Current detector
 
-- `scores_by_scenario.png`, `metrics_by_scenario.png` — produced by `make plots`
-  from the real `make selfcheck` / `make xsim` metrics (seed `0xC0FFEE`).
+- `ddmap_peaks.png` — clean-vs-spoofed ddMap peak (strongest PRN) from a real-C/A
+  DBZP acquisition on TEXBAT (`docs/single_pass_detection.md`).
+- `benchmark_dbzp_vs_pcs.png` — measured DBZP-vs-PCS benchmark (sensitivity, PRN
+  accuracy, ds7 spoof) from `scripts/benchmark.py`
+  (`docs/comparison_baseline_vs_ddmap.md`).
 
-## Waveform
+### Pending current-kernel hardware renders
 
-- `waveform_mixed_attack.png` — a timing diagram rendered by
-  `scripts/render_wave.py` from `mixed_attack.vcd`, the value-change dump from a
-  real XSim run of `tb_gnss_top` on the `mixed_attack` scenario under `burst`
-  backpressure (seed `0xC0FFEE`). Every transition shown is a real transition in
-  the VCD. It highlights a metrics-output backpressure interval where
-  `m_axis_tvalid` is held while `m_axis_tready = 0` and `tdata` stays stable — the
-  AXIS rule that a functional C simulation cannot exercise.
+The own-FFT ddMap kernel (`hls/src/ddmap_sqm_hls.cpp`) is verified by csim + csynth
+(`hls/vitis_hls/run_ddmap_ownfft.tcl`, 488.76 MHz) but has **not** yet been packaged
+into a Vivado IP-Integrator block design, so there is **no current-kernel
+block-design image or AXIS waveform yet** — and none is faked. When the own-FFT kernel
+is integrated into a BD, regenerate the block-design diagram and an AXIS-handshake
+waveform from that kernel (headless under Xvfb, the same flow the legacy BD used).
+The latency + CDC properties of the integrated PL fabric are already audited in
+`docs/audit_latency_cdc.md` (single-clock, all paths safely timed).
 
-  XSim on this install has no headless GUI-to-PNG export, so the committed PNG is a
-  faithful matplotlib rendering of the actual VCD signal data rather than a GUI
-  screenshot (no fabricated screenshot is committed).
+## Legacy streaming front-end (superseded — documents the old metric engine only)
 
-  A real XSim GUI capture was attempted under a virtual framebuffer (Xvfb): the
-  Vivado simulator GUI does launch and load the design, but the wave window cannot
-  be brought to the foreground, focused, or zoomed to the backpressure interval
-  without interactive control — the simulator exposes no scriptable wave-focus or
-  zoom-to-range Tcl command, and no GUI-automation tool (xdotool) is available
-  headless. Every capture rendered the source/objects panel, not a legible wave
-  window. Rather than commit a screenshot that does not actually show the
-  waveform, the matplotlib render above (real VCD data) remains the waveform
-  artifact. To capture the XSim wave window interactively, open the design in the
-  Vivado GUI on a real display and apply `mixed_attack.wcfg`.
+These render the legacy NCO/PRN/metric-engine subsystem and are referenced only by
+the legacy docs (`docs/system_integration.md`, `docs/latency_report_template.md`):
 
-- `mixed_attack.vcd` — the real value-change dump (open directly in GTKWave, or
-  import into the Vivado/XSim waveform viewer).
-- `mixed_attack.wcfg` — a Vivado XSim waveform configuration naming the same
-  signals, for the interactive GUI view.
+- `gnss_block_design.png` / `.svg` — the legacy metric-kernel Vivado block design.
+- `waveform_mixed_attack.png` + `mixed_attack.vcd` / `.wcfg` — a real XSim VCD render
+  of the legacy `tb_gnss_top` under burst backpressure (rendered by
+  `scripts/render_wave.py`; every transition is a real VCD transition).
+- `scores_by_scenario.png`, `metrics_by_scenario.png` — the legacy 8-scenario metric/
+  score charts (`make plots`).
 
-### Reproduce
-
-```
-# regenerate the VCD, the native .wdb, and the rendered PNG in one step:
-make waves
-
-# or open interactively in the Vivado GUI:
-#   1. regenerate the native waveform database:
-#        cd <a scratch dir>
-#        xvlog -sv -d SIM_ASSERT <repo>/rtl/gnss/gnss_top_pkg.sv <repo>/rtl/common/*.sv \
-#              <repo>/rtl/gnss/*.sv <repo>/tb/axis_bfm.sv <repo>/tb/gnss_scoreboard.sv \
-#              <repo>/tb/tb_gnss_top.sv
-#        xelab tb_gnss_top -s wsim -d SIM_ASSERT --timescale 1ns/1ps -debug typical
-#        echo 'log_wave -recursive *; run all; exit' > dump.tcl
-#        xsim wsim -tclbatch dump.tcl -wdb mixed_attack.wdb \
-#             --testplusarg INFILE=<repo>/vectors/mixed_attack/input_iq.txt \
-#             --testplusarg OUTFILE=/tmp/o.txt --testplusarg SCENARIO=mixed_attack \
-#             --testplusarg STALL_MODE=burst --testplusarg SEED=12648430
-#   2. vivado -> Open Static Simulation -> load mixed_attack.wdb, apply mixed_attack.wcfg
-```
-
-The native `.wdb` is several megabytes and is regenerable from the command above,
-so it is not committed; the equivalent `.vcd` (same signal data, much smaller) is.
+They are retained as evidence of the legacy subsystem's streaming/backpressure
+discipline; they do not describe the current ddMap/SQM detector.

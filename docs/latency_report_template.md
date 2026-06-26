@@ -2,6 +2,11 @@
 
 Author: John Bagshaw — License: MIT (c) 2026 John Bagshaw
 
+> **Legacy.** This template targets the superseded streaming metric engine's
+> `axis_latency_counter` (README §11). The current ddMap/SQM detector's end-to-end
+> latency is measured and audited in `docs/audit_latency_cdc.md` (271,504 cycles =
+> 555.5 µs per cell @ 488.76 MHz, 7.2× real-time headroom).
+
 This is a TEMPLATE. It is filled from real `axis_latency_counter` output captured
 during an XSim run; it contains no invented numbers. The latency counter measures,
 per window, the cycles from the first accepted input I/Q beat to the metrics output

@@ -2,6 +2,12 @@
 
 Author: John Bagshaw — License: MIT (c) 2026 John Bagshaw
 
+> **Legacy.** The NCO/PRN/metric-engine bring-up steps below are for the superseded
+> streaming front-end (README §11). The current ddMap/SQM detector takes pre-wiped,
+> decimated I/Q over AXI4-Stream and a `prn` over s_axilite; its hardware path is the
+> standard Zynq UltraScale+ DMA + s_axilite pattern (see `docs/architecture.md` and
+> `docs/audit_latency_cdc.md`).
+
 This design is simulation-complete and structured for a real bench. Nothing below
 claims board validation; the items marked TODO genuinely require board
 documentation that is not assumed to exist.

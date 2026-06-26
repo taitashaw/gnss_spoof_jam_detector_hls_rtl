@@ -2,52 +2,47 @@
 
 Author: John Bagshaw — License: MIT (c) 2026 John Bagshaw
 
-This is deliberately honest scope. The design is simulation-complete; the items
-here are real boundaries, not defects.
+Deliberately honest scope for the current **DBZP ddMap + own-FFT + SQM** detector.
+These are real boundaries, not defects, and every one is reported elsewhere with
+measurements.
 
-- Not a certified GPS receiver. It is a streaming anomaly-detection accelerator
-  that computes GNSS-relevant metrics. It does not acquire, track, or produce a
-  position, velocity, or time solution.
+- **ds2 (overpowered time-push) is not separated by the SQM distortion.** The
+  early/late distortion catches matched-power SCER (ds7) at 100% / 0% clean
+  false-alarm, but an overpowered, displaced-but-clean peak (ds2) is honestly not
+  separated by peak shape — it must be caught by absolute power / ddMap energy. See
+  `docs/single_pass_detection.md`.
+- **Sample scope is one slice per scenario**, over the acquired satellites, at a
+  single coherent length — a measured result, not a full ROC sweep. The DBZP-vs-PCS
+  sensitivity gain (+1–2 dB) is consistent with literature but measured on a limited
+  set (`docs/comparison_baseline_vs_ddmap.md`).
+- **Not a tracking receiver.** It computes one acquisition ddMap cell per call and
+  reads spoof/jam signatures off it; it does not close tracking loops or output a
+  PVT solution.
+- **Carrier-Doppler wipeoff and the PRN/Doppler search loop are the host's job.** The
+  kernel computes one cell (one PRN, one Doppler hypothesis); the outer search is
+  software.
+- **Throughput cost of the 488 MHz timing closure.** Closing 400 MHz used a ping-pong
+  FFT (II=2 butterfly) and per-call LOAD/OUT copies, raising latency from 80,208 to
+  271,504 cycles/cell (~3.4×). It still meets the real-time monitoring deadline (7.2×
+  per-cell headroom; `docs/audit_latency_cdc.md`). A streaming SDF FFT would recover
+  throughput but is not required by the deadline.
+- **Not yet integrated into a Vivado block design.** The own-FFT kernel is verified
+  by csim + csynth (488.76 MHz). It has not yet been packaged as IP into a BD, so
+  there is no current-kernel hardware image/waveform yet (none is faked). The PL-fabric
+  CDC/latency properties are audited on the existing single-clock integration
+  (`docs/audit_latency_cdc.md`).
+- **Cold full-sky acquisition is not real-time per 4 ms window.** A full 32-PRN ×
+  ~13-Doppler search is ~416 cells = 231 ms — fine at an operational detection cadence
+  (≥ ~250 ms), but it exceeds a single 4 ms coherent window. Continuous per-window
+  monitoring is sized for a tracked set of ≤ 7 satellites.
+- **Not board-validated.** Synthesis, timing, csim, and the latency/CDC audit are real
+  and committed; there is no on-hardware run.
 
-- The PRN generator is PRN-like, not a full GPS C/A code. It is a 10-bit Fibonacci
-  LFSR producing a deterministic, reproducible chip sequence suitable for the
-  anomaly demonstration. A certified design would implement the full Gold-code pair
-  with the correct G1/G2 polynomials and per-satellite phase taps.
+## Legacy streaming front-end (superseded)
 
-- C/N0 is a proxy, not a calibrated carrier-to-noise-density ratio in dB-Hz. It is
-  a division-free log-domain ratio of the despread prompt correlation to the
-  noise-floor estimate, with the correct monotonicity but no absolute calibration.
-
-- Doppler is a simplified anomaly proxy, not a frequency estimate. It is an
-  FFT-free instantaneous-frequency energy measure (the summed magnitude of the
-  cross-product between consecutive mixed samples). It rises with residual carrier
-  rate and with broadband interference; it does not report a Doppler value in Hz.
-
-- The early/prompt/late spacing is one sample for the demonstration, and the
-  streaming RTL uses edge-fill at the two window-boundary chip taps where the golden
-  model uses a window-local wrap. This is documented and bounded; it cannot change
-  an alert flag.
-
-- No live RF validation yet. All results come from deterministic synthetic I/Q.
-  The path to real capture is described in `hardware_bringup_notes.md` and is gated
-  on board documentation.
-
-- No fabricated resource or timing numbers. Vitis HLS C synthesis was run (Vitis
-  HLS 2025.2 via `vitis-run --mode hls`); the resulting utilization (DSP 4, FF
-  1735, LUT 4026, BRAM 0), the 5.00 ns clock target met at an estimated 3.625 ns,
-  and the II = 1 accumulation loop are reported verbatim from the tool in
-  `docs/synthesis_report.md` with the raw reports under `docs/synth/`. These are
-  post-C-synthesis estimates; final post-implementation utilization and timing
-  closure require Vivado place-and-route, which is a deferred phase. The
-  cycle-accurate per-window latency is measured directly by `axis_latency_counter`
-  in XSim, and `latency_report_template.md` is a structured template for those
-  measured runs.
-
-- Not yet implemented on hardware. There is no Vivado IP Integrator block design,
-  no bitstream, and no on-board bring-up yet. These are deferred phases listed in
-  the README roadmap, gated on the NT1065 FMC board documentation.
-
-- The thresholds and score weights are tuned on the eight reference scenarios to
-  separate them cleanly. They are a defensible default starting point, not
-  field-calibrated detection thresholds; on real signals they would be retuned
-  against labeled captures.
+The earlier streaming anomaly metric engine (NCO mixer → PRN LFSR → fixed-point
+metric engine → alert packer) is superseded by the detector above (README §11). Its
+own limitations — a PRN-*like* LFSR rather than a real C/A code, an FFT-free Doppler
+proxy, the legacy metric-kernel synthesis numbers (DSP 4 / FF 1735 / LUT 4026 /
+BRAM 0 at 5 ns) — applied to that subsystem and do **not** describe the current
+detector, which uses real G1/G2 C/A Gold codes and a real FFT.
