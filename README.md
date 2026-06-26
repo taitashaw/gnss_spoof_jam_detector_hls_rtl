@@ -165,15 +165,19 @@ PS → AXI DMA (MM2S) → kernel `iq_in`, results read back over the kernel's
 `s_axi_ctrl` registers (the kernel has no AXIS output — results are register reads,
 not an S2MM stream).
 
-![Current own-FFT ddMap/SQM block design](docs/images/gnss_block_design.png)
+The image below is a screenshot of the actual Vivado IP Integrator canvas.
+
+![Current own-FFT ddMap/SQM block design (Vivado IP Integrator)](docs/images/gnss_block_design.png)
 
 C/RTL co-simulation (`cosim_design`) **passes** — possible now that the FFT is our
-own (the vendor FFT C-model blocked it before). The real cosim VCD shows the kernel's
-`iq_in` AXI4-Stream handshake: `TREADY` held low while the kernel computes the C/A
-generation and code FFT, then asserted to read one 2048-beat block (TVALID high, real
-TDATA streaming, `TLAST` at the end) — genuine kernel-side backpressure.
+own (the vendor FFT C-model blocked it before). The screenshot below is the **actual
+Vivado XSim waveform viewer** on that cosim, zoomed to the kernel's `iq_in`
+AXI4-Stream backpressure interval: `iq_in_TREADY` held **low** while the kernel
+computes the C/A generation and the code FFT, then **rising to high** at ~75 us to
+read a 2048-beat block, with `iq_in_TDATA` beginning to stream at that edge
+(`iq_in_TVALID` high, `TLAST`/`ap_done` low) — genuine kernel-side backpressure.
 
-![Current kernel iq_in AXIS handshake (real XSim cosim)](docs/images/waveform_ddmap_axis.png)
+![Vivado XSim waveform viewer: iq_in AXIS handshake at the backpressure interval](docs/images/waveform_ddmap_axis.png)
 
 ## 10. How to run
 
