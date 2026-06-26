@@ -27,11 +27,21 @@
 #define SAMP_PER_CHIP 2
 #define NS            2046      // SAMP_PER_CHIP * CA_LEN
 #define N_BLK         4         // coherent blocks (ms) per ddMap cell
-#define PROD_GAIN     16384.0   // 2^14 spectral-product rescale (see correlation loop)
+#define PROD_SHIFT    14        // spectral-product rescale = 2^14 (left shift)
 
-typedef ap_fixed<48, 24> acc_t;            // coherent accumulator (wide)
-typedef ap_ufixed<64, 32> pw_t;            // power
+typedef ap_fixed<24, 6, AP_RND_CONV> acc_t;  // coherent accumulator (narrow -> fast sq)
+typedef ap_ufixed<48, 14> pw_t;            // |corr|^2 power
+typedef ap_fixed<34, 6, AP_RND_CONV, AP_SAT> psat_t;  // saturating product rescale
 typedef ap_axiu<32, 0, 0, 0> axis_iq_t;    // 16b I in [31:16], 16b Q in [15:0]
+
+// scale a power to a 48-bit integer output by a pure left shift (no multiplier);
+// relative magnitudes are preserved (the outputs are only compared as ratios).
+static ap_uint<48> pw_to_u48(pw_t v) {
+#pragma HLS INLINE
+    ap_ufixed<72, 48> w = v;
+    w <<= 20;
+    return (ap_uint<48>)w;
+}
 
 // ---- real GPS C/A code (G1/G2 LFSR, IS-GPS-200) -> upsampled +/-0.5 ----------
 static void gen_ca_upsampled(int prn, fdata_t code_re[FFT_N], fdata_t code_im[FFT_N]) {
@@ -104,8 +114,8 @@ BLOCKS: for (int b = 0; b < N_BLK; ++b) {
             axis_iq_t s = iq_in.read();
             ap_int<16> ii = s.data(31, 16);
             ap_int<16> qq = s.data(15, 0);
-            blk_re[i] = fdata_t(ii) / fdata_t(65536);
-            blk_im[i] = fdata_t(qq) / fdata_t(65536);
+            blk_re[i] = (fdata_t)(((ap_fixed<34, 18>)ii) >> 16);   // int16 -> ~[-0.5,0.5)
+            blk_im[i] = (fdata_t)(((ap_fixed<34, 18>)qq) >> 16);
         }
         fft_fixed(blk_re, blk_im, blk_fd_re, blk_fd_im, false);
         // circular cross-correlation: blk_fd * conj(code_fd), rescaled up.
@@ -115,10 +125,14 @@ BLOCKS: for (int b = 0; b < N_BLK; ++b) {
         // location and the early/late distortion ratio (the outputs we use).
         for (int i = 0; i < FFT_N; ++i) {
 #pragma HLS PIPELINE II=1
-            fmul_t ar = (fmul_t)blk_fd_re[i], ai = (fmul_t)blk_fd_im[i];
-            fmul_t br = (fmul_t)code_fd_re[i], bi = (fmul_t)code_fd_im[i];  // conj -> -bi
-            prod_re[i] = (fdata_t)((ar * br + ai * bi) * (fmul_t)PROD_GAIN);
-            prod_im[i] = (fdata_t)((ai * br - ar * bi) * (fmul_t)PROD_GAIN);
+            fdata_t a_r = blk_fd_re[i], a_i = blk_fd_im[i];
+            fdata_t b_r = code_fd_re[i], b_i = code_fd_im[i];   // conj(code) -> -b_i
+            psat_t pr = (psat_t)(a_r * b_r) + (psat_t)(a_i * b_i);   // 24x24 mults
+            psat_t pi = (psat_t)(a_i * b_r) - (psat_t)(a_r * b_i);
+            // gain = 2^PROD_SHIFT applied as a left shift (no multiplier); the wide
+            // intermediate saturates, then fdata_t clamps -- same as the old x-gain.
+            prod_re[i] = (fdata_t)(((ap_fixed<48, 22, AP_TRN, AP_SAT>)pr) << PROD_SHIFT);
+            prod_im[i] = (fdata_t)(((ap_fixed<48, 22, AP_TRN, AP_SAT>)pi) << PROD_SHIFT);
         }
         fft_fixed(prod_re, prod_im, corr_re, corr_im, true);   // IFFT -> 1 ms corr
         for (int i = 0; i < FFT_N; ++i) {
@@ -128,14 +142,24 @@ BLOCKS: for (int b = 0; b < N_BLK; ++b) {
         }
     }
 
-    // |coherent corr|^2 profile -> peak + early/late SQM
-    pw_t best = 0; ap_uint<16> bi = 0;
+    // |coherent corr|^2 profile -> peak + early/late SQM.
+    // Partial max reduction: NP parallel maxima, element i -> lane i%NP, so each
+    // lane's max-update recurrence has distance NP (not 1) and pipelines at the
+    // target clock. The NP partials are combined after the loop.
+    const int NP = 4;
+    pw_t bestp[NP]; ap_uint<16> bip[NP];
+#pragma HLS ARRAY_PARTITION variable=bestp complete
+#pragma HLS ARRAY_PARTITION variable=bip complete
+    for (int k = 0; k < NP; ++k) { bestp[k] = 0; bip[k] = 0; }
 SQM: for (int i = 0; i < NS; ++i) {
 #pragma HLS PIPELINE II=1
         acc_t re = accum_re[i], im = accum_im[i];
         pw_t p = (pw_t)(re * re) + (pw_t)(im * im);
-        if (p > best) { best = p; bi = i; }
+        int s = i & (NP - 1);
+        if (p > bestp[s]) { bestp[s] = p; bip[s] = i; }
     }
+    pw_t best = bestp[0]; ap_uint<16> bi = bip[0];
+    for (int k = 1; k < NP; ++k) if (bestp[k] > best) { best = bestp[k]; bi = bip[k]; }
     int e = (bi - SAMP_PER_CHIP / 2 + NS) % NS;   // +/-0.5 chip
     int l = (bi + SAMP_PER_CHIP / 2) % NS;
     acc_t er = accum_re[e], ei = accum_im[e];
@@ -146,11 +170,11 @@ SQM: for (int i = 0; i < NS; ++i) {
     pw_t sum = ep + lp;
     pw_t diff = (ep > lp) ? (ep - lp) : (lp - ep);
     ap_uint<32> dist = 0;
-    if (sum > 0) dist = (ap_uint<32>)((ap_ufixed<64, 32>)(diff / sum) * 65536);  // Q16
+    if (sum > 0) dist = (ap_uint<32>)(((ap_ufixed<48, 16>)(diff / sum)) << 16);  // Q16
 
-    peak_power = (ap_uint<48>)(best * pw_t(1 << 20));
+    peak_power = pw_to_u48(best);
     code_phase = bi;
     distortion_q16 = dist;
-    early_power = (ap_uint<48>)(ep * pw_t(1 << 20));
-    late_power  = (ap_uint<48>)(lp * pw_t(1 << 20));
+    early_power = pw_to_u48(ep);
+    late_power  = pw_to_u48(lp);
 }

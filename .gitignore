@@ -81,3 +81,4 @@ vectors/ddmap_hls/
 hls/vitis_hls/ddmap_ownfft_prj/
 ddmap_ownfft_prj/
 vectors/fft_test/
+hls/vitis_hls/ddmap_ownfft400_prj/

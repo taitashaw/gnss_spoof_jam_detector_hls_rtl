@@ -13,6 +13,8 @@ golden, which the FPE-blocked vendor path never allowed.
 | Parameter | Choice |
 |---|---|
 | Algorithm | Radix-2 decimation-in-time (DIT), bit-reversed input load, natural-order output |
+| Microarchitecture | Ping-pong between two buffers (`fft_stage(s, src, dst)` with distinct src/dst arrays) so each stage's butterfly is memory-conflict-free and pipelines; flattened butterfly loop (N/2 per stage), II=2; four real multiplies bound to pipelined DSP48E2 (`BIND_OP latency=3`); twiddle index via shift (`j << (10-s)`), not a multiply |
+| Timing | **488.76 MHz** (2.046 ns) in the ddMap detector at the 2.5 ns / 400 MHz target -- met with +0.45 ns slack. The pipelining is numerically transparent: it did not change the accuracy below |
 | Length | N = 2048 (11 stages); matches the ddMap config |
 | Data type | `ap_fixed<24, 4, AP_RND_CONV, AP_SAT>` (4 integer bits, 20 fractional, convergent rounding, saturation) |
 | Twiddle type | `ap_fixed<18, 2, AP_RND_CONV, AP_SAT>` (16 fractional bits; \|W\| ≤ 1) |

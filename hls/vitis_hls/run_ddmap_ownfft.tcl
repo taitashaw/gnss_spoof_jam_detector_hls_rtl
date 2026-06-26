@@ -8,7 +8,7 @@ add_files    $REPO/hls/src/ddmap_sqm_hls.cpp   -cflags "$INC"
 add_files -tb $REPO/hls/tb/tb_ddmap_sqm_hls.cpp -cflags "$INC"
 open_solution -reset sol1
 set_part xczu7ev-ffvc1156-2-e
-create_clock -period 5 -name default
+create_clock -period 2.5 -name default
 puts "==== C SIMULATION (own FFT, vs Python golden) ===="
 if {[catch {csim_design -argv "$REPO"} e]} { puts "CSIM_STATUS: FAILED $e" } else { puts "CSIM_STATUS: PASSED" }
 puts "==== C SYNTHESIS ===="

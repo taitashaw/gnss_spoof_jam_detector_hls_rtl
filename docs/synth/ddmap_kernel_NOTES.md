@@ -38,21 +38,42 @@ Verbatim from `docs/synth/ddmap_ownfft_csynth.rpt`:
 
 | Metric | Value |
 |---|---|
-| BRAM_18K | 52 / 624 (8%) |
-| DSP | 86 / 1728 (5%) |
-| FF | 7650 / 460800 (2%) |
-| LUT | 10416 / 230400 (5%) |
+| BRAM_18K | 58 / 624 (9%) |
+| DSP | 14 / 1728 (1%) |
+| FF | 7878 / 460800 (2%) |
+| LUT | 9539 / 230400 (4%) |
 | URAM | 0 |
-| Timing target / estimated | 5.00 ns / **6.825 ns** (146.51 MHz) |
+| Timing target / estimated | 2.50 ns / **2.046 ns** (**488.76 MHz**), +0.45 ns slack |
+| Latency | 271,504 cycles (~0.56 ms @ 2.046 ns); FFT butterfly II=2 |
 
-**Fit:** comfortably fits the ZCU104 (≤8% of any resource). One shared `fft_fixed`
-instance is reused for the code FFT, per-block FFT, and IFFT (not inlined 9×).
+**Timing — MET (target was 400 MHz / 2.5 ns).** Estimated 2.046 ns = **488.76 MHz**,
+comfortably past 400 MHz with positive slack. Closed by retiming (no algorithm or
+accuracy change), in order of impact:
 
-**Timing (honest negative):** the design does **NOT** meet the 5 ns (200 MHz) target
-— the csynth-estimated critical path is 6.825 ns (≈146 MHz), set by the fixed-point
-radix-2 butterfly's complex multiply-add. It is implementable at ≈146 MHz; closing
-5 ns would need a deeper-pipelined butterfly (ping-pong stage buffers / registered
-DSP cascade), which is future work. Reported as measured, not met.
+1. **Conflict-free FFT memory (ping-pong):** each radix-2 stage reads one buffer and
+   writes another (`fft_stage(s, src, dst)` with distinct array args), so the
+   flattened butterfly has no in-place read/write recurrence -> it pipelines (146 ->
+   354 MHz). The two same-array writes still force butterfly II=2 (the latency cost).
+2. **DSP-registered butterfly:** the four real multiplies are bound to pipelined
+   DSP48E2 (`BIND_OP latency=3` -> A/B, M, P registers).
+3. **Multipliers -> shifts:** the input `/65536`, the spectral-product `*2^14` gain,
+   and the power output `*2^20` scaling are powers of two, rewritten as left shifts.
+   This removed the wide (80-97 bit) multipliers that capped the clock and **cut DSP
+   86 -> 14** (354 -> 489 MHz). It also fixed an input-saturation quirk, so detector
+   distortion now matches the golden almost exactly (0.3305 vs 0.3305).
+4. **Partial-max reduction:** the SQM peak search keeps 4 parallel maxima (lane
+   i%4) so the max-update recurrence has distance 4, not 1.
+
+**Accuracy preserved (the hard rule):** the numpy FFT gate still PASSES unchanged
+(tone 96.5 dB/15.7 ENOB, C/A 85.6 dB/13.9 ENOB, worst impulse7 8.8 ENOB), and the
+detector csim still PASSES (peak phases 600/1393 exact, ds7 distortion 0.799 > clean
+0.330, wrong-PRN 47.5x lower). No accuracy was traded for timing.
+
+**Cost of the speed-up:** latency 80,208 -> 271,504 cycles (~3.4x), from the
+ping-pong LOAD/OUT copies per FFT call and the II=2 butterfly; FF ~flat (7650 ->
+7878); BRAM 52 -> 58 (ping-pong buffers); LUT and **DSP both dropped** (shifts
+replaced multipliers). Throughput is lower per the latency, but the **clock target
+(400 MHz) is met** and the design still fits the ZCU104 easily (≤9%).
 
 ## Superseded — the old `hls_fft.h` (vendor-FFT) approach
 
@@ -61,6 +82,5 @@ The earlier kernel used the Xilinx FFT IP. Those numbers
 ~274 MHz**) are **retired** — they describe the vendor-FFT design, which **could not
 be simulated** (csim/cosim both blocked by the FFT C-model `SIGFPE`). They do NOT
 describe the current detector. The current, simulatable design is the own-FFT build
-above. Trade between the two: the vendor IP closes timing faster (~274 vs ~146 MHz)
-and uses fewer DSPs, but cannot be C-simulated on this install; our FFT is slower and
-uses more DSPs but is fully verifiable (numpy-checked FFT + passing detector csim).
+above — which is now both **fully verifiable** (numpy-checked FFT + passing detector
+csim) **and faster** (489 vs 274 MHz) at far fewer DSPs (14 vs 54).
