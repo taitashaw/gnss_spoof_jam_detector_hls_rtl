@@ -308,6 +308,33 @@ matched-power spoofer, not the overpowered one — and `peak_count`/`peak_ratio`
 not separate either (clean multipath). DBZP coherent integration provides the
 measured sensitivity (a weak satellite below threshold at 1 ms is acquired by 8 ms).
 
+### Benchmark: PCS baseline vs DBZP ddMap (measured)
+
+A head-to-head on the same inputs (`scripts/benchmark.py`,
+`docs/comparison_baseline_vs_ddmap.md`), reported as the numbers stand:
+
+- **Sensitivity:** DBZP minimum detectable C/N0 is **+1 dB (4 ms) / +2 dB (10 ms)**
+  better than PCS at matched ~1% false-alarm — inside the literature-consistent
+  ~2–3 dB range, not a tens-of-dB anomaly.
+- **PRN accuracy:** equal (both 7/7 truth satellites; no spurious cross-correlation
+  PRNs).
+- **Spoof (ds7 SCER):** comparable — both flag the distortion at 100% / 0% clean
+  false-alarm; DBZP acquires more satellites (10 vs 3), so more coverage.
+- **Cost:** a trade — DBZP needs ~3× fewer large FFTs at fine Doppler but ~2× the
+  working memory.
+
+Verdict: more sensitive (+1–2 dB) with more satellite coverage, traded against ~2×
+memory; spoof/jam detection quality comparable. Not a uniform win.
+
+**Kernel scope note.** The HLS/RTL synthesis, implementation, block-design, and
+latency numbers elsewhere in this README and under `docs/synth/` describe the
+original **streaming metric-engine** kernel (the LFSR/NCO-PRN anomaly accelerator).
+The **DBZP ddMap + SQM detector** above — the real detection core on real GPS data —
+is implemented and validated as the C/Python golden plus this benchmark; an HLS
+realignment of its FFT-correlation kernel (heavier per the cost table) is the next
+hardware step and has not been synthesized. No ddMap-kernel synthesis number is
+claimed.
+
 ## Roadmap — deferred phases
 
 What is done is stated plainly above: the golden model, the RTL datapath, full

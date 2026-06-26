@@ -1,5 +1,12 @@
 # HLS Synthesis Report
 
+> **Kernel scope.** The numbers in this document are for the original streaming
+> metric-engine kernel (LFSR/NCO-PRN anomaly accelerator), NOT the DBZP ddMap + SQM
+> single-pass detector (the real detection core on real GPS data, validated as the
+> C/Python golden + benchmark in `docs/comparison_baseline_vs_ddmap.md`). The ddMap
+> FFT-correlation kernel is heavier (see the benchmark cost table) and has not yet
+> been synthesized; no ddMap-kernel synthesis/impl number is claimed.
+
 Author: John Bagshaw — License: MIT (c) 2026 John Bagshaw
 
 Every number on this page is copied verbatim from the Vitis HLS tool's own
