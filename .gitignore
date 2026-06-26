@@ -76,3 +76,8 @@ results/texbat_*/
 hls/vitis_hls/ddmap_sqm_prj/
 ddmap_sqm_prj/
 vectors/ddmap_hls/
+
+# own-FFT detector project + FFT test vectors (regenerable)
+hls/vitis_hls/ddmap_ownfft_prj/
+ddmap_ownfft_prj/
+vectors/fft_test/

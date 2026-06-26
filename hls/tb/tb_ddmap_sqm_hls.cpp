@@ -3,17 +3,14 @@
 // ----------------------------------------------------------------------------
 // Author : John Bagshaw   License : MIT (c) 2026 John Bagshaw
 //
-// Checks the fixed-point hls::fft kernel against the Python float golden at the
-// matched config (scripts/ddmap_hls_vectors.py). Fixed-point FFT is not bit-exact
-// vs float, so the checks are: peak code phase EXACT; distortion within tolerance;
+// Checks the own-FFT ddMap/SQM kernel against the Python float golden at the matched
+// config (scripts/ddmap_hls_vectors.py). The fixed-point FFT is not bit-exact vs
+// float, so the checks are: peak code phase EXACT; distortion within tolerance;
 // wrong-PRN peak power much lower than correct-PRN. Returns non-zero on failure.
+// (Our own FFT has no vendor C-model, so this csim actually runs.)
 //
-// Pass the repo root as argv[1] (run_hls.tcl supplies it).
+// Pass the repo root as argv[1] (run_ddmap_ownfft.tcl supplies it).
 // ============================================================================
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE   // for fedisableexcept (glibc)
-#endif
-#include <fenv.h>
 #include "hls_stream.h"
 #include "ap_int.h"
 #include "ap_axi_sdata.h"
@@ -63,9 +60,6 @@ static Ref load_ref(const std::string &path) {
 }
 
 int main(int argc, char **argv) {
-#ifdef FE_ALL_EXCEPT
-    fedisableexcept(FE_ALL_EXCEPT);   // don't trap FP exceptions raised inside the FFT C-model
-#endif
     std::string root = (argc > 1) ? argv[1] : ".";
     std::string dir = root + "/vectors/ddmap_hls/";
     int fails = 0;
