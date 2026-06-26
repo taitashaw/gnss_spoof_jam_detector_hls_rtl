@@ -284,10 +284,29 @@ On the real data, both the C reference and XSim (bit-exact) show:
 - **ds7:** all metrics move under 8% — the matched-power SCER attack is not clearly
   flagged. ds7 is decisively harder than ds2.
 
-Honest scope: this is a pre-tracking anomaly accelerator with a PRN-like LFSR, not
-a C/A tracking receiver, so the correlation metrics do not provide despread-based
-discrimination (full C/A acquisition is the next step). Full method, tables, the
+Honest scope: that pre-tracking path uses a PRN-like LFSR, not a C/A tracking
+receiver, so its correlation metrics do not provide despread-based discrimination
+(the ds7 null above is exactly that LFSR-front limitation). Full method, tables, the
 null result, and provenance are in `docs/texbat_validation.md`.
+
+### Single-pass detection from the acquisition delay-Doppler map (real C/A)
+
+To address that limitation, a single-pass detector computes spoof statistics
+directly from a real-C/A DBZP acquisition delay-Doppler map (ddMap) — one pass, no
+separate tracking stage (a clean-room port of the author's York University receiver;
+see `docs/single_pass_detection.md`). On the real slices it acquires 11 GPS
+satellites, and gated on clean-slice false-alarm:
+
+- **ds7 (matched-power SCER):** the early/late peak-distortion metric separates at
+  **100% detection, 0% clean false-alarm** — the authentic and delayed replica
+  coexist and distort the correlation peak (a signal-quality-monitoring signature).
+- **ds2 (overpowered):** the ddMap peak shape does **not** separate (single clean
+  displaced peak); that attack is caught by power, not peak structure.
+
+This revises the naive expectation honestly — distortion catches the coexisting
+matched-power spoofer, not the overpowered one — and `peak_count`/`peak_ratio` did
+not separate either (clean multipath). DBZP coherent integration provides the
+measured sensitivity (a weak satellite below threshold at 1 ms is acquired by 8 ms).
 
 ## Roadmap — deferred phases
 
