@@ -71,3 +71,8 @@ build/vivado_bd_impl/
 /texbat/
 vectors/texbat_*/
 results/texbat_*/
+
+# ddMap kernel HLS project (regenerable)
+hls/vitis_hls/ddmap_sqm_prj/
+ddmap_sqm_prj/
+vectors/ddmap_hls/
