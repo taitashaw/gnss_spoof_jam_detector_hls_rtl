@@ -1,27 +1,31 @@
 # ============================================================================
-# run_bd_ownfft.tcl -- Zynq UltraScale+ block design for the CURRENT own-FFT
-#                      ddMap/SQM detector kernel (xilinx.com:hls:ddmap_sqm_hls:1.0)
+# run_bd_gnss_spoof_jam_detector_system.tcl
+#   Zynq UltraScale+ block design for the own-FFT ddMap/SQM GNSS spoof/jam
+#   detector kernel (xilinx.com:hls:ddmap_sqm_hls:1.0).
 # Author: John Bagshaw   License: MIT (c) 2026 John Bagshaw
 #
-# Batch, no GUI. Integrates the CURRENT own-FFT kernel:
+# Batch, no GUI. Reproduces the COMPLETE current diagram end to end, including
+# the external RESULTS_READY_IRQ port and the two I/O annotation comments, so a
+# fresh rebuild regenerates exactly what exists today.
+#
 #   PS M_AXI_HPM0 -> ctrl_smc -> { AXI DMA S_AXI_LITE, kernel s_axi_ctrl }
 #   AXI DMA MM2S (32b) -> kernel iq_in
 #   AXI DMA M_AXI_MM2S -> data_smc -> PS S_AXI_HP0 (DDR)
+#   kernel interrupt -> external port RESULTS_READY_IRQ
 # The kernel has NO AXIS output (results are read over s_axi_ctrl registers:
-# peak_power, code_phase, distortion_q16, early/late_power), so there is no S2MM --
-# this is the real interface of the own-FFT kernel, not the legacy MM2S+S2MM kernel.
+# peak_power, code_phase, distortion_q16, early/late_power), so there is no S2MM.
 #
-# Run:  vivado -mode batch -source vivado/run_bd_ownfft.tcl
+# Run:  vivado -mode batch -source vivado/run_bd_gnss_spoof_jam_detector_system.tcl
 # ============================================================================
 set REPO    [file normalize [file join [file dirname [info script]] ..]]
 set PART    xczu7ev-ffvc1156-2-e
 set IP_REPO $REPO/hls/vitis_hls/ddmap_ownfft_ip_prj/sol1/impl/ip
-set BD      gnss_ownfft_system_bd
-set PROJDIR $REPO/build/vivado_bd_ownfft
+set BD      gnss_spoof_jam_detector_system_bd
+set PROJDIR $REPO/build/vivado_bd_gnss_spoof_jam_detector_system
 
 if {![file exists $IP_REPO/component.xml]} { puts "ERROR: own-FFT IP not found at $IP_REPO"; exit 1 }
 file mkdir $PROJDIR
-create_project -force gnss_ownfft_system $PROJDIR -part $PART
+create_project -force gnss_spoof_jam_detector_system $PROJDIR -part $PART
 set_property ip_repo_paths [list $IP_REPO] [current_project]
 update_ip_catalog
 create_bd_design $BD
@@ -40,7 +44,7 @@ set_property -dict [list \
     CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ {100} \
 ] $ps
 
-# ---- CURRENT own-FFT ddMap/SQM kernel ----
+# ---- own-FFT ddMap/SQM kernel ----
 set kern [create_bd_cell -type ip -vlnv xilinx.com:hls:ddmap_sqm_hls:1.0 ddmap_sqm_hls_0]
 # discover the kernel's interface pins by type (robust to naming)
 set kern_axis [get_bd_intf_pins -of $kern -filter {VLNV =~ *axis* && MODE == Slave}]
@@ -98,6 +102,14 @@ connect_bd_intf_net [get_bd_intf_pins data_smc/M00_AXI] [get_bd_intf_pins zynq_u
 # ---- AXI4-Stream datapath: DMA MM2S -> kernel iq_in ----
 connect_bd_intf_net [get_bd_intf_pins axi_dma_0/M_AXIS_MM2S] $kern_axis
 
+# ---- manual addition #1: kernel interrupt made external as RESULTS_READY_IRQ ----
+set irq_port [create_bd_port -dir O -type intr RESULTS_READY_IRQ]
+connect_bd_net [get_bd_pins ddmap_sqm_hls_0/interrupt] $irq_port
+
+# ---- manual addition #2: the two I/O annotation comments ----
+set_property USER_COMMENTS.comment_0 {I/Q INPUT (AXIS) - DMA-fed; FMC/ADC injection point} [current_bd_design]
+set_property USER_COMMENTS.comment_1 {RESULTS OUT - read via s_axi_ctrl registers} [current_bd_design]
+
 # ---- addresses + validate ----
 assign_bd_address
 regenerate_bd_layout
@@ -119,6 +131,6 @@ if {[catch {write_bd_layout -force -format svg $REPO/docs/images/gnss_block_desi
 } else { puts "WROTE_BD_SVG" }
 
 # ---- BD wrapper ----
-make_wrapper -files [get_files $PROJDIR/gnss_ownfft_system.srcs/sources_1/bd/$BD/$BD.bd] -top
+make_wrapper -files [get_files $PROJDIR/gnss_spoof_jam_detector_system.srcs/sources_1/bd/$BD/$BD.bd] -top
 puts "BD_DONE"
 exit 0

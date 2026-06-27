@@ -14,7 +14,7 @@ legacy metric-engine images remain.
   → AXI DMA (MM2S) → kernel `iq_in`, with the kernel's `s_axi_ctrl` (results:
   peak_power, code_phase, distortion, early/late power) and the DMA control on the PS
   `M_AXI_HPM0` via the two SmartConnects, plus the processor reset. Built and validated
-  (zero critical warnings) by `vivado/run_bd_ownfft.tcl`; captured headless under Xvfb
+  (zero critical warnings) by `vivado/run_bd_gnss_spoof_jam_detector_system.tcl`; captured headless under Xvfb
   (`vivado -mode gui` + `regenerate_bd_layout`, `import -window root`).
 - `gnss_block_design.svg` — the same block design exported as vector by Vivado's
   `write_bd_layout`. See `docs/images/BLOCK_DESIGN.md`.

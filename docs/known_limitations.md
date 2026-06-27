@@ -28,7 +28,7 @@ measurements.
   throughput but is not required by the deadline.
 - **Not board-flashed.** The own-FFT kernel is exported as IP and integrated into a
   Zynq UltraScale+ block design that validates with zero critical warnings
-  (`vivado/run_bd_ownfft.tcl`), with a rendered block-design diagram and a real cosim
+  (`vivado/run_bd_gnss_spoof_jam_detector_system.tcl`), with a rendered block-design diagram and a real cosim
   AXIS waveform (`docs/images/`), and the PL-fabric CDC/latency are audited
   (`docs/audit_latency_cdc.md`) — but there is no on-hardware run (no bitstream flashed
   to a board).

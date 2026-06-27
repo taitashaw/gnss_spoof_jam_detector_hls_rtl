@@ -160,7 +160,7 @@ Head-to-head on the same inputs (`scripts/benchmark.py`,
 
 The current own-FFT kernel is exported as IP (`xilinx.com:hls:ddmap_sqm_hls:1.0`,
 `hls/vitis_hls/run_export_ownfft.tcl`) and integrated into a Zynq UltraScale+ block
-design (`vivado/run_bd_ownfft.tcl`) that **validates with zero critical warnings**:
+design (`vivado/run_bd_gnss_spoof_jam_detector_system.tcl`) that **validates with zero critical warnings**:
 PS → AXI DMA (MM2S) → kernel `iq_in`, results read back over the kernel's
 `s_axi_ctrl` registers (the kernel has no AXIS output — results are register reads,
 not an S2MM stream).

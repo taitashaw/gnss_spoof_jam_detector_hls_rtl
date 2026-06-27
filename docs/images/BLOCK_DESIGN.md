@@ -26,14 +26,14 @@ PDF is rasterized.
 vitis-run --mode hls --tcl hls/vitis_hls/run_export_ownfft.tcl
 
 # 2) build + validate the block design (zero critical warnings) and write SVG
-vivado -mode batch -source vivado/run_bd_ownfft.tcl        # writes docs/images/gnss_block_design.svg
+vivado -mode batch -source vivado/run_bd_gnss_spoof_jam_detector_system.tcl   # writes docs/images/gnss_block_design.svg
 
 # 3) PNG = screenshot of the real IP Integrator canvas, headless under Xvfb
 #    (wide framebuffer so the whole BD fits; regenerate_bd_layout tidies placement)
 export DISPLAY=:98 ; Xvfb :98 -screen 0 3840x1400x24 &
 vivado -mode gui -source - <<'TCL' &
-open_project build/vivado_bd_ownfft/gnss_ownfft_system.xpr
-open_bd_design [get_files gnss_ownfft_system_bd.bd]
+open_project build/vivado_bd_gnss_spoof_jam_detector_system/gnss_spoof_jam_detector_system.xpr
+open_bd_design [get_files gnss_spoof_jam_detector_system_bd.bd]
 regenerate_bd_layout
 TCL
 sleep 105 ; import -window root /tmp/bd_full.png       # capture the canvas
@@ -41,11 +41,11 @@ sleep 105 ; import -window root /tmp/bd_full.png       # capture the canvas
 
 # 4) SVG = Vivado vector export of the same canvas (start_gui enables the renderer)
 vivado -mode batch -source - <<'TCL'
-open_project build/vivado_bd_ownfft/gnss_ownfft_system.xpr
-open_bd_design [get_files gnss_ownfft_system_bd.bd]
+open_project build/vivado_bd_gnss_spoof_jam_detector_system/gnss_spoof_jam_detector_system.xpr
+open_bd_design [get_files gnss_spoof_jam_detector_system_bd.bd]
 start_gui
 write_bd_layout -format svg -orientation landscape -force docs/images/gnss_block_design.svg
 TCL
 ```
 
-To inspect interactively: `vivado build/vivado_bd_ownfft/gnss_ownfft_system.xpr`.
+To inspect interactively: `vivado build/vivado_bd_gnss_spoof_jam_detector_system/gnss_spoof_jam_detector_system.xpr`.
