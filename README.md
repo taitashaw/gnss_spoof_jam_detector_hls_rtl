@@ -43,6 +43,22 @@ that flags both directly from the acquisition map — without a full tracking re
 (security-code estimation and replay, TEXBAT ds7), is exactly what the SQM distortion
 metric catches here.
 
+## Reproduce in 60 seconds
+
+No Xilinx tools, no external data — plain Linux with `python3` and `g++`:
+
+​```bash
+git clone https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl
+cd gnss_spoof_jam_detector_hls_rtl
+make selfcheck        # generates vectors, runs the golden sim, checks results
+cat results/summary.md
+​```
+
+`make selfcheck` generates the test vectors, runs the numpy-verified FFT and
+detector against the Python golden, and writes a pass/fail summary. This is the
+exact flow the CI badge above runs on every push. For the full Vivado/Vitis flow
+and TEXBAT real-data validation, see [How to run](#10-how-to-run).
+
 ## 3. The FFT — from-scratch, numpy-verified (the heart of the design)
 
 The ddMap correlation needs an FFT. Rather than depend on a vendor IP whose
