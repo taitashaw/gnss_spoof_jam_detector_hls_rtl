@@ -43,14 +43,18 @@ that flags both directly from the acquisition map — without a full tracking re
 (security-code estimation and replay, TEXBAT ds7), is exactly what the SQM distortion
 metric catches here.
 
-## Reproduce in 60 seconds
+## 3. Reproduce in 60 seconds
 
 No Xilinx tools, no external data — plain Linux with `python3` and `g++`:
 
 ​```bash
+
 git clone https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl
+
 cd gnss_spoof_jam_detector_hls_rtl
+
 make selfcheck        # generates vectors, runs the golden sim, checks results
+
 cat results/summary.md
 ​```
 
