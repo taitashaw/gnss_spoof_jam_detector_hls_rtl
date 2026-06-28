@@ -116,6 +116,17 @@ reduction) with **no accuracy change** — both gates above still pass. Full met
 the cost (latency 80,208 → 271,504 cycles, DSP 86 → 14) are in
 `docs/synth/ddmap_kernel_NOTES.md`.
 
+### Synthesis (ddMap/SQM kernel, Zynq UltraScale+ ZCU104)
+
+| Resource | Used | Available | Utilization |
+|----------|------|-----------|-------------|
+| LUT | 9,539 | 230,400 | 4% |
+| FF | 7,878 | 460,800 | 2% |
+| BRAM_18K | 58 | 624 | 9% |
+| DSP | 14 | 1,728 | 1% |
+
+**Timing:** target 2.50 ns (400 MHz), achieved 2.046 ns = 488.76 MHz with +0.45 ns slack. Closed by retiming — no algorithm or precision change. The optimized kernel is both faster and lighter than the baseline: 489 vs 274 MHz at 14 vs 54 DSP.
+
 ## 7. Real-data validation (TEXBAT)
 
 Texas Spoofing Test Battery (UT Austin Radionavigation Lab, Humphreys et al., ION
