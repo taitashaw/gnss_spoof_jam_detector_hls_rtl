@@ -35,6 +35,16 @@ legacy metric-engine images remain.
   snapshot, `add_wave` the `iq_in_*` / `ap_*` signals, `run 76500 ns` (so XSim's
   auto-zoom lands on the TREADY transition), and screenshot the wave window (headless:
   Xvfb + `import -window root`).
+- `waveform_system_e2e.png` — a **screenshot of the actual Vivado XSim waveform
+  viewer** from the full-system RTL simulation (`tb_gnss_top` driving `gnss_top`,
+  `delayed_spoof` scenario). It shows the complete run (0–44 us): IQ samples streaming
+  in over AXI4-Stream (`s_tvalid`/`s_tready`), the internal `tap_*` datapath monitor,
+  results out (`m_tdata`), and the scoreboard reaching **3/3 packets, 0 errors**
+  (`sb_packets` 0→3, `sb_errors` flat at 0). RTL system sim, not HLS cosim.
+- `waveform_axis_detail.png` — the same simulation zoomed to beat resolution
+  (~30.0–30.7 us), showing the cycle-level AXI4-Stream handshake: `s_tvalid`/`s_tready`
+  per-beat, distinct `s_tdata` sample values, the `tap_*` monitor pulsing per sample,
+  and the stable 512-bit `m_tdata` result word. XSim tool window, not a re-plot.
 
 ## Detection charts
 

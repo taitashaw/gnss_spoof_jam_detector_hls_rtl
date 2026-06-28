@@ -179,6 +179,14 @@ read a 2048-beat block, with `iq_in_TDATA` beginning to stream at that edge
 
 ![Vivado XSim waveform viewer: iq_in AXIS handshake at the backpressure interval](docs/images/waveform_ddmap_axis.png)
 
+**Full-system RTL simulation** — the complete detector running in Vivado XSim (`tb_gnss_top` driving `gnss_top`), `delayed_spoof` scenario: IQ stream in via AXI4-Stream, through the NCO/PRN/correlator datapath, results out, with the scoreboard reporting **3/3 packets captured, 0 errors**.
+
+![End-to-end RTL system simulation: delayed_spoof, 3/3 packets, scoreboard clean](docs/images/waveform_system_e2e.png)
+
+Cycle-level view of the AXI4-Stream handshake (`s_tvalid`/`s_tready`, internal `tap_*` monitor, and `m_tdata` results) at beat resolution:
+
+![Beat-level AXI4-Stream handshake at cycle resolution](docs/images/waveform_axis_detail.png)
+
 ## 10. How to run
 
 ```
