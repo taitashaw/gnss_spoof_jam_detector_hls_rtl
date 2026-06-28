@@ -207,6 +207,26 @@ with zero false/weak PRNs, DBZP with one); and on the ds7 SCER spoof both reach
 
 ![DBZP ddMap vs PCS baseline: sensitivity, PRN acquisition, ds7 SCER detection (real TEXBAT)](docs/images/benchmark_dbzp_vs_pcs.png)
 
+### Detection results (real TEXBAT)
+
+| Scenario | Clean SNR | Spoofed SNR | Spoof signature | Detection | Clean false-alarm |
+|----------|-----------|-------------|-----------------|-----------|-------------------|
+| ds2 PRN13 | 930 | 559 | Slightly displaced C/A peak | — | — |
+| ds7 PRN13 (SCER) | 1147 | 593 | Asymmetric ~1-chip shoulder | 100% | 0% |
+
+### DBZP ddMap vs PCS baseline (measured, same data)
+
+| Metric | DBZP ddMap | PCS baseline |
+|--------|-----------|--------------|
+| Min detectable C/N0 @4 ms | 39 dB-Hz | 40 dB-Hz |
+| Min detectable C/N0 @10 ms | (2.0 dB better) | baseline |
+| True PRNs acquired @4 ms | 7 / 7 | 7 / 7 |
+| False / weak PRNs | 1 | 0 |
+| ds7 SCER spoof detection | 100% | 100% |
+| Clean false-alarm | 0% | 0% |
+
+DBZP is 1.0 dB more sensitive at 4 ms (2.0 dB at 10 ms); PCS is marginally cleaner on false PRNs. Both detect the matched-power SCER spoof at 100% with zero false-alarm on clean data.
+
 ## 12. Verification hierarchy
 
 numpy FFT accuracy gate → detector C-sim vs the Python golden → (XSim cycle sim of the
