@@ -18,27 +18,8 @@ GPS receiver (York University); nothing is fabricated
 
 ## 1. The detector at a glance
 
-```
-Pre-wiped, decimated I/Q  (one 1 ms C/A block, 2046 samples @ 2.046 Msps)
-        |
-        v
-+---------------------------------------------------------------+
-|  ddMap / SQM detector  (hls/src/ddmap_sqm_hls.cpp)            |
-|                                                              |
-|  on-chip C/A code (G1/G2 Gold code)  --FFT-->  conj          |
-|                                                  |           |
-|  block I/Q  --FFT-->  x ----------------> IFFT --+--> corr   |
-|                                                  (coherent   |
-|                                       accumulate over N_BLK) |
-|                                                  |           |
-|                          delay-Doppler-map cell -+           |
-|                                                  |           |
-|     peak power | code phase | early/late SQM distortion      |
-+---------------------------------------------------------------+
-        |
-        v
-  spoof = distortion > threshold ; jam = floor / energy elevation
-```
+
+<img src="docs/images/gnss_architecture.png" alt="End-to-end GNSS spoof/jam detector architecture: RF capture, DMA into Zynq UltraScale+ PL, RTL acquisition front-end, HLS ddMap/SQM correlator, spoof/jam decision" width="640">
 
 One call computes one ddMap cell (one PRN, one Doppler hypothesis, `N_BLK = 4`
 coherent 1 ms blocks). The carrier-Doppler wipeoff and the outer PRN/Doppler search
