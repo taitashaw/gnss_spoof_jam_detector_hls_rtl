@@ -47,7 +47,8 @@ metric catches here.
 
 No Xilinx tools, no external data — plain Linux with `python3` and `g++`:
 
-​```bash
+​```
+bash
 
 git clone https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl
 
@@ -56,6 +57,7 @@ cd gnss_spoof_jam_detector_hls_rtl
 make selfcheck        # generates vectors, runs the golden sim, checks results
 
 cat results/summary.md
+
 ​```
 
 `make selfcheck` generates the test vectors, runs the numpy-verified FFT and
