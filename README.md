@@ -2,7 +2,7 @@
 
 ![selfcheck](https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl/actions/workflows/selfcheck.yml/badge.svg)
 
-Author: John Bagshaw <jotshaw007@gmail.com> — License: MIT (c) 2026 John Bagshaw
+Author: John Bagshaw <john@shawsilicon.ai> — License: MIT (c) 2026 John Bagshaw
 
 A fixed-point FPGA accelerator that detects GPS L1 C/A **spoofing** and **jamming**
 from the acquisition **delay-Doppler map (ddMap)**. It runs a single-pass DBZP
@@ -13,7 +13,7 @@ energy / noise-floor elevation for jamming. Validated on real recorded spoofing
 (TEXBAT ds2/ds7) and synthesized to **488.76 MHz** on a Zynq UltraScale+ (ZCU104).
 
 The detection algorithm is a clean-room MIT re-implementation of the author's own
-published GPS receiver (York University, Prof. Sunil Bisnath); nothing is fabricated
+GPS receiver (York University); nothing is fabricated
 — every number below is verbatim from a committed report.
 
 ## 1. The detector at a glance
@@ -229,9 +229,9 @@ is the ddMap/SQM core.
 
 ## 13. Provenance and integrity
 
-Detection algorithms are a clean-room MIT re-implementation of the author's published
+Detection algorithms are a clean-room MIT re-implementation of the author's
 MATLAB receiver (`norm_acq_parcode` baseline, `weak_acq_optimized_DBZP` candidate;
-York University, Prof. Sunil Bisnath). Every synthesis/timing/accuracy number in this
+York University). Every synthesis/timing/accuracy number in this
 README is verbatim from a committed report under `docs/synth/` or `docs/`. TEXBAT
 `.bin` files are never committed (path + SHA256 + citation only). Negative results
 (ds2 not separated by distortion; the legacy metric kernel superseded) are reported.
