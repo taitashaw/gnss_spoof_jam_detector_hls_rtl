@@ -234,5 +234,4 @@ MATLAB receiver (`norm_acq_parcode` baseline, `weak_acq_optimized_DBZP` candidat
 York University, Prof. Sunil Bisnath). Every synthesis/timing/accuracy number in this
 README is verbatim from a committed report under `docs/synth/` or `docs/`. TEXBAT
 `.bin` files are never committed (path + SHA256 + citation only). Negative results
-(ds2 not separated by distortion; the legacy metric kernel superseded) are reported
-honestly.
+(ds2 not separated by distortion; the legacy metric kernel superseded) are reported.
