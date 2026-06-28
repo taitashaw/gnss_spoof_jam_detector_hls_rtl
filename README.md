@@ -1,7 +1,6 @@
 # GNSS Spoofing and Jamming Detection Accelerator (HLS + RTL)
 
 ![selfcheck](https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl/actions/workflows/selfcheck.yml/badge.svg)
-
 ![Vivado](https://img.shields.io/badge/Vivado-2025.2-blue)
 ![Vitis HLS](https://img.shields.io/badge/Vitis%20HLS-2025.2-blue)
 ![Target](https://img.shields.io/badge/Target-Zynq%20UltraScale%2B%20ZCU104-blue)
@@ -44,7 +43,7 @@ that flags both directly from the acquisition map — without a full tracking re
 (security-code estimation and replay, TEXBAT ds7), is exactly what the SQM distortion
 metric catches here.
 
-## Reproduce in 60 seconds
+## 3. Reproduce in 60 seconds
 
 No Xilinx tools, no external data — plain Linux with `python3` and `g++`:
 
@@ -59,7 +58,7 @@ Generates the scenario vectors, builds the C reference model, runs the full
 attack matrix against the Python golden, and writes an 8/8 pass/fail summary.
 This is the exact flow the selfcheck badge above runs on every push. The Vitis
 HLS kernel build and TEXBAT real-data validation are separate flows — see
-[How to run](#10-how-to-run).
+[How to run](#11-how-to-run).
 
 ## 4. The FFT — from-scratch, numpy-verified (the heart of the design)
 
