@@ -186,14 +186,35 @@ vitis-run --mode hls --tcl hls/vitis_hls/run_ddmap_ownfft.tcl   # detector csim 
 `scripts/dbzp_acq.py` / `scripts/pcs_acq.py` / `scripts/benchmark.py` reproduce the
 acquisition, baseline, and benchmark on real TEXBAT data.
 
-## 11. Verification hierarchy
+## 11. Results analysis
+
+The detector is characterized on real recorded TEXBAT vectors (ds2, ds7). Two
+results establish that it both acquires correctly and flags the spoof.
+
+**Single-pass ddMap peak (clean vs spoofed).** The acquisition code-phase profile
+itself carries the spoof signature. On ds2, PRN13 shows a clean, slightly displaced
+C/A triangle (clean SNR 930, spoofed SNR 559). On ds7 — the matched-power SCER case —
+the spoofed profile is visibly asymmetric with a ~1-chip shoulder (clean SNR 1147,
+spoofed SNR 593). That distortion is exactly what the early/late SQM metric measures.
+
+![Single-pass ddMap peak: clean vs spoofed, ds2 and ds7 PRN13 (real TEXBAT)](docs/images/ddmap_peaks.png)
+
+**DBZP ddMap vs PCS baseline (measured).** Against a phase-coherent-summation (PCS)
+baseline on the same data: DBZP is 1.0 dB more sensitive at 4 ms (39 vs 40 dB-Hz
+min detectable C/N0, 2.0 dB at 10 ms); both acquire all 7 true PRNs at 4 ms (PCS
+with zero false/weak PRNs, DBZP with one); and on the ds7 SCER spoof both reach
+100% spoof detection with 0% false-alarm on clean data.
+
+![DBZP ddMap vs PCS baseline: sensitivity, PRN acquisition, ds7 SCER detection (real TEXBAT)](docs/images/benchmark_dbzp_vs_pcs.png)
+
+## 12. Verification hierarchy
 
 numpy FFT accuracy gate → detector C-sim vs the Python golden → (XSim cycle sim of the
 RTL front-end) → TEXBAT real-data validation → latency + CDC audit. Details in
 `docs/verification_strategy.md`. The single golden source for the detection math is
 `scripts/dbzp_acq.py` / `scripts/gps_ca.py`.
 
-## 12. Legacy streaming front-end (superseded — not the detector)
+## 13. Legacy streaming front-end (superseded — not the detector)
 
 An earlier version of this repo implemented a **streaming anomaly metric engine**: an
 RTL NCO mixer → PRN LFSR / early-prompt-late tap → fixed-point HLS metric engine →
@@ -212,7 +233,7 @@ core. Its files are retained for reference and clearly labeled as legacy:
 No part of the current detector depends on the legacy front-end; the detection itself
 is the ddMap/SQM core.
 
-## 13. Provenance and integrity
+## 14. Provenance and integrity
 
 Detection algorithms are a clean-room MIT re-implementation of the author's
 MATLAB receiver (`norm_acq_parcode` baseline, `weak_acq_optimized_DBZP` candidate;
