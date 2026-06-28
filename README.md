@@ -1,9 +1,11 @@
 # GNSS Spoofing and Jamming Detection Accelerator (HLS + RTL)
+
 ![selfcheck](https://github.com/taitashaw/gnss_spoof_jam_detector_hls_rtl/actions/workflows/selfcheck.yml/badge.svg)
 ![Vivado](https://img.shields.io/badge/Vivado-2025.2-blue)
 ![Vitis HLS](https://img.shields.io/badge/Vitis%20HLS-2025.2-blue)
 ![Target](https://img.shields.io/badge/Target-Zynq%20UltraScale%2B%20ZCU104-blue)
 ![IQ data](https://img.shields.io/badge/IQ%20data-TEXBAT%20ds2%2Fds7-green)
+
 Author: John Bagshaw <john@shawsilicon.ai> — License: MIT (c) 2026 John Bagshaw
 
 A fixed-point FPGA accelerator that detects GPS L1 C/A **spoofing** and **jamming**
