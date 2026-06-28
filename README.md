@@ -63,9 +63,9 @@ cat results/summary.md
 `make selfcheck` generates the test vectors, runs the numpy-verified FFT and
 detector against the Python golden, and writes a pass/fail summary. This is the
 exact flow the CI badge above runs on every push. For the full Vivado/Vitis flow
-and TEXBAT real-data validation, see [How to run](#10-how-to-run).
+and TEXBAT real-data validation, see [How to run](#11-how-to-run).
 
-## 3. The FFT — from-scratch, numpy-verified (the heart of the design)
+## 4. The FFT — from-scratch, numpy-verified (the heart of the design)
 
 The ddMap correlation needs an FFT. Rather than depend on a vendor IP whose
 bit-accurate C-model could not be simulated on this install, the detector uses an
@@ -83,7 +83,7 @@ own **radix-2 decimation-in-time fixed-point FFT** (`hls/src/fft_fixed.hpp`,
 Because this FFT is ordinary C++ with no vendor model, the detector's C-simulation
 actually runs — which is how a latent on-chip C/A shift-sign bug was caught and fixed.
 
-## 4. Detector C-simulation vs the Python golden
+## 5. Detector C-simulation vs the Python golden
 
 `hls/tb/tb_ddmap_sqm_hls.cpp` runs the synthesizable kernel against the Python golden
 (`scripts/ddmap_hls_vectors.py`) at the matched 2-samples/chip config. **PASS:**
@@ -97,7 +97,7 @@ actually runs — which is how a latent on-chip C/A shift-sign bug was caught an
 Correct-PRN code phase is exact, wrong-PRN cross-correlation is suppressed 47.5×, and
 the ds7-spoofed SQM distortion (0.799) is well above the clean floor (0.330).
 
-## 5. Synthesis — real numbers (Vitis HLS 2025.2, xczu7ev-ffvc1156-2-e)
+## 6. Synthesis — real numbers (Vitis HLS 2025.2, xczu7ev-ffvc1156-2-e)
 
 Verbatim from `docs/synth/ddmap_ownfft_csynth.rpt` (own-FFT detector):
 
@@ -116,7 +116,7 @@ reduction) with **no accuracy change** — both gates above still pass. Full met
 the cost (latency 80,208 → 271,504 cycles, DSP 86 → 14) are in
 `docs/synth/ddmap_kernel_NOTES.md`.
 
-## 6. Real-data validation (TEXBAT)
+## 7. Real-data validation (TEXBAT)
 
 Texas Spoofing Test Battery (UT Austin Radionavigation Lab, Humphreys et al., ION
 GNSS+ 2012). The ~43 GB `.bin` files are never committed — referenced by path +
@@ -136,7 +136,7 @@ distortion metric honestly does not separate; it is caught by absolute power /
 ddMap energy. Sample scope is one slice per scenario over the acquired satellites —
 a measured result, not a full ROC.
 
-## 7. Benchmark — DBZP ddMap vs the PCS baseline
+## 8. Benchmark — DBZP ddMap vs the PCS baseline
 
 Head-to-head on the same inputs (`scripts/benchmark.py`,
 `docs/comparison_baseline_vs_ddmap.md`), reported as measured:
@@ -149,7 +149,7 @@ Head-to-head on the same inputs (`scripts/benchmark.py`,
 - **Cost:** a trade — DBZP needs ~3× fewer large FFTs at fine Doppler but ~2× the
   working memory.
 
-## 8. Latency + CDC audit
+## 9. Latency + CDC audit
 
 `docs/audit_latency_cdc.md` (measured from the csynth report and Vivado
 `report_cdc`):
@@ -163,7 +163,7 @@ Head-to-head on the same inputs (`scripts/benchmark.py`,
 - **Decision:** HLS passes — no RTL overhaul. A streaming SDF FFT would add throughput
   headroom but is not required by the deadline.
 
-## 9. System integration (block design + AXIS waveform)
+## 10. System integration (block design + AXIS waveform)
 
 The current own-FFT kernel is exported as IP (`xilinx.com:hls:ddmap_sqm_hls:1.0`,
 `hls/vitis_hls/run_export_ownfft.tcl`) and integrated into a Zynq UltraScale+ block
@@ -194,7 +194,7 @@ Cycle-level view of the AXI4-Stream handshake (`s_tvalid`/`s_tready`, internal `
 
 ![Beat-level AXI4-Stream handshake at cycle resolution](docs/images/waveform_axis_detail.png)
 
-## 10. How to run
+## 11. How to run
 
 ```
 python3 scripts/gen_fft_twiddle.py                 # twiddle ROM (compile-time)
@@ -208,7 +208,7 @@ vitis-run --mode hls --tcl hls/vitis_hls/run_ddmap_ownfft.tcl   # detector csim 
 `scripts/dbzp_acq.py` / `scripts/pcs_acq.py` / `scripts/benchmark.py` reproduce the
 acquisition, baseline, and benchmark on real TEXBAT data.
 
-## 11. Results analysis
+## 12. Results analysis
 
 The detector is characterized on real recorded TEXBAT vectors (ds2, ds7). Two
 results establish that it both acquires correctly and flags the spoof.
@@ -249,14 +249,14 @@ with zero false/weak PRNs, DBZP with one); and on the ds7 SCER spoof both reach
 
 DBZP is 1.0 dB more sensitive at 4 ms (2.0 dB at 10 ms); PCS is marginally cleaner on false PRNs. Both detect the matched-power SCER spoof at 100% with zero false-alarm on clean data.
 
-## 12. Verification hierarchy
+## 13. Verification hierarchy
 
 numpy FFT accuracy gate → detector C-sim vs the Python golden → (XSim cycle sim of the
 RTL front-end) → TEXBAT real-data validation → latency + CDC audit. Details in
 `docs/verification_strategy.md`. The single golden source for the detection math is
 `scripts/dbzp_acq.py` / `scripts/gps_ca.py`.
 
-## 13. Legacy streaming front-end (superseded — not the detector)
+## 14. Legacy streaming front-end (superseded — not the detector)
 
 An earlier version of this repo implemented a **streaming anomaly metric engine**: an
 RTL NCO mixer → PRN LFSR / early-prompt-late tap → fixed-point HLS metric engine →
@@ -275,7 +275,7 @@ core. Its files are retained for reference and clearly labeled as legacy:
 No part of the current detector depends on the legacy front-end; the detection itself
 is the ddMap/SQM core.
 
-## 14. Provenance and integrity
+## 15. Provenance and integrity
 
 Detection algorithms are a clean-room MIT re-implementation of the author's
 MATLAB receiver (`norm_acq_parcode` baseline, `weak_acq_optimized_DBZP` candidate;
